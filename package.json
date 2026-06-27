@@ -1,0 +1,48 @@
+{
+  "name": "pos-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "POS System with Inventory Management - Monorepo",
+  "scripts": {
+    "dev": "DOTENV_CONFIG_PATH=../../.env turbo run dev --concurrency=25",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "type-check": "turbo run type-check",
+    "clean": "turbo run clean",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "db:migrate": "turbo run db:migrate",
+    "db:seed": "turbo run db:seed",
+    "services:api-gateway": "pnpm --filter @pos/api-gateway dev",
+    "services:sync": "pnpm --filter @pos/sync-service dev",
+    "services:churn": "pnpm --filter @pos/churn-engine dev",
+    "services:reservation": "pnpm --filter @pos/reservation-service dev",
+    "services:staff": "pnpm --filter @pos/staff-optimization-service dev",
+    "apps:pos": "pnpm --filter @pos/pos-terminal dev",
+    "apps:kds": "pnpm --filter @pos/kds dev",
+    "apps:crm": "pnpm --filter @pos/crm-dashboard dev",
+    "apps:manager": "pnpm --filter @pos/manager-dashboard dev",
+    "apps:kiosk": "pnpm --filter @pos/kiosk dev",
+    "apps:mobile": "pnpm --filter @pos/mobile-app start"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.0",
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "pnpm@11.8.0"
+}

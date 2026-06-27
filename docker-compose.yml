@@ -1,0 +1,439 @@
+# POS System - Local Development Infrastructure
+# Run: docker compose up -d
+# This starts all infrastructure dependencies. Services run separately via pnpm dev.
+
+networks:
+  pos-network:
+    driver: bridge
+
+volumes:
+  postgres_auth_data:
+  postgres_menu_data:
+  postgres_orders_data:
+  postgres_inventory_data:
+  postgres_payments_data:
+  postgres_customers_data:
+  postgres_marketing_data:
+  postgres_reporting_data:
+  postgres_store_data:
+  postgres_sync_data:
+  postgres_churn_data:
+  postgres_reservation_data:
+  postgres_staff_data:
+  redis_data:
+  kafka_data:
+  zookeeper_data:
+
+services:
+  # ————————————————————————————————————————
+  # PostgreSQL - Auth Service DB
+  # ————————————————————————————————————————
+  postgres-auth:
+    image: postgres:16-alpine
+    container_name: pos-postgres-auth
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pos_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pos_password}
+      POSTGRES_DB: pos_auth
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_auth_data:/var/lib/postgresql/data
+    networks:
+      - pos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pos_user} -d pos_auth"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ————————————————————————————————————————
+  # PostgreSQL - Menu Service DB
+  # ————————————————————————————————————————
+  postgres-menu:
+    image: postgres:16-alpine
+    container_name: pos-postgres-menu
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pos_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pos_password}
+      POSTGRES_DB: pos_menu
+    ports:
+      # 5433 is occupied by a host service on this machine; use 5445 instead
+      - "5445:5432"
+    volumes:
+      - postgres_menu_data:/var/lib/postgresql/data
+    networks:
+      - pos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pos_user} -d pos_menu"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ————————————————————————————————————————
+  # PostgreSQL - Order Service DB
+  # ————————————————————————————————————————
+  postgres-orders:
+    image: postgres:16-alpine
+    container_name: pos-postgres-orders
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pos_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pos_password}
+      POSTGRES_DB: pos_orders
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_orders_data:/var/lib/postgresql/data
+    networks:
+      - pos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pos_user} -d pos_orders"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ————————————————————————————————————————
+  # PostgreSQL - Inventory Service DB
+  # ————————————————————————————————————————
+  postgres-inventory:
+    image: postgres:16-alpine
+    container_name: pos-postgres-inventory
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pos_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pos_password}
+      POSTGRES_DB: pos_inventory
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_inventory_data:/var/lib/postgresql/data
+    networks:
+      - pos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pos_user} -d pos_inventory"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ————————————————————————————————————————
+  # PostgreSQL - Payments Service DB
+  # ————————————————————————————————————————
+  postgres-payments:
+    image: postgres:16-alpine
+    container_name: pos-postgres-payments
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pos_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pos_password}
+      POSTGRES_DB: pos_payments
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres_payments_data:/var/lib/postgresql/data
+    networks:
+      - pos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pos_user} -d pos_payments"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ————————————————————————————————————————
+  # PostgreSQL - Customer Service DB
+  # ————————————————————————————————————————
+  postgres-customers:
+    image: postgres:16-alpine
+    container_name: pos-postgres-customers
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pos_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pos_password}
+      POSTGRES_DB: pos_customers
+    ports:
+      - "5437:5432"
+    volumes:
+      - postgres_customers_data:/var/lib/postgresql/data
+    networks:
+      - pos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pos_user} -d pos_customers"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ————————————————————————————————————————
+  # PostgreSQL - Reporting Service DB
+  # ————————————————————————————————————————
+  postgres-reporting:
+    image: postgres:16-alpine
+    container_name: pos-postgres-reporting
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pos_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pos_password}
+      POSTGRES_DB: pos_reporting
+    ports:
+      - "5439:5432"
+    volumes:
+      - postgres_reporting_data:/var/lib/postgresql/data
+    networks:
+      - pos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pos_user} -d pos_reporting"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ————————————————————————————————————————
+  # PostgreSQL - Marketing Service DB
+  # ————————————————————————————————————————
+  postgres-marketing:
+    image: postgres:16-alpine
+    container_name: pos-postgres-marketing
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pos_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pos_password}
+      POSTGRES_DB: pos_marketing
+    ports:
+      - "5438:5432"
+    volumes:
+      - postgres_marketing_data:/var/lib/postgresql/data
+    networks:
+      - pos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pos_user} -d pos_marketing"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ————————————————————————————————————————
+  # PostgreSQL - Store Service DB (branding / white-label)
+  # ————————————————————————————————————————
+  postgres-store:
+    image: postgres:16-alpine
+    container_name: pos-postgres-store
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pos_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pos_password}
+      POSTGRES_DB: pos_store
+    ports:
+      - "5440:5432"
+    volumes:
+      - postgres_store_data:/var/lib/postgresql/data
+    networks:
+      - pos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pos_user} -d pos_store"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ————————————————————————————————————————
+  # PostgreSQL - Sync Service DB (offline queue)
+  # ————————————————————————————————————————
+  postgres-sync:
+    image: postgres:16-alpine
+    container_name: pos-postgres-sync
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pos_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pos_password}
+      POSTGRES_DB: pos_sync
+    ports:
+      - "5441:5432"
+    volumes:
+      - postgres_sync_data:/var/lib/postgresql/data
+    networks:
+      - pos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pos_user} -d pos_sync"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ————————————————————————————————————————
+  # PostgreSQL - Churn Engine DB
+  # ————————————————————————————————————————
+  postgres-churn:
+    image: postgres:16-alpine
+    container_name: pos-postgres-churn
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pos_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pos_password}
+      POSTGRES_DB: pos_churn
+    ports:
+      - "5442:5432"
+    volumes:
+      - postgres_churn_data:/var/lib/postgresql/data
+    networks:
+      - pos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pos_user} -d pos_churn"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ————————————————————————————————————————
+  # PostgreSQL - Reservation Service DB
+  # ————————————————————————————————————————
+  postgres-reservation:
+    image: postgres:16-alpine
+    container_name: pos-postgres-reservation
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pos_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pos_password}
+      POSTGRES_DB: pos_reservations
+    ports:
+      - "5443:5432"
+    volumes:
+      - postgres_reservation_data:/var/lib/postgresql/data
+    networks:
+      - pos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pos_user} -d pos_reservations"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ————————————————————————————————————————
+  # PostgreSQL - Staff Optimization Service DB
+  # ————————————————————————————————————————
+  postgres-staff:
+    image: postgres:16-alpine
+    container_name: pos-postgres-staff
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-pos_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pos_password}
+      POSTGRES_DB: pos_staff_optimization
+    ports:
+      - "5444:5432"
+    volumes:
+      - postgres_staff_data:/var/lib/postgresql/data
+    networks:
+      - pos-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pos_user} -d pos_staff_optimization"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ————————————————————————————————————————
+  # Redis - Cache, sessions, pub/sub, rate limiting
+  # ————————————————————————————————————————
+  redis:
+    image: redis:7-alpine
+    container_name: pos-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - pos-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ————————————————————————————————————————
+  # Zookeeper - Required by Kafka
+  # ————————————————————————————————————————
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: pos-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+    networks:
+      - pos-network
+
+  # ————————————————————————————————————————
+  # Kafka - Event bus for all domain events
+  # ————————————————————————————————————————
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: pos-kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_MESSAGE_MAX_BYTES: 1048576
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - pos-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ————————————————————————————————————————
+  # Kafka UI - Browse topics, messages, consumer groups
+  # ————————————————————————————————————————
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: pos-kafka-ui
+    restart: unless-stopped
+    depends_on:
+      - kafka
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: pos-local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    networks:
+      - pos-network
+
+  # ————————————————————————————————————————
+  # NEW SERVICES (Phase 1 Implementation)
+  # Note: Run these separately via pnpm dev scripts
+  # ————————————————————————————————————————
+
+  # api-gateway (Port 3000) - pnpm services:api-gateway
+  # sync-service (Port 3006) - pnpm services:sync
+  # churn-engine (Port 3009) - pnpm services:churn
+  # reservation-service (Port 3010) - pnpm services:reservation
+  # staff-optimization-service (Port 3011) - pnpm services:staff
+
+  # ————————————————————————————————————————
+  # pgAdmin - Postgres UI for development
+  # ————————————————————————————————————————
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pos-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@pos.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "5050:80"
+    networks:
+      - pos-network
+    depends_on:
+      - postgres-auth
