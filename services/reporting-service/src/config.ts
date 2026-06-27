@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const configSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().default(3008),
+  PORT: z.coerce.number().default(Number(process.env.REPORTING_SERVICE_PORT ?? process.env.PORT ?? 3008)),
   REPORTING_DB_URL: z.string().min(1),
   KAFKA_BROKER_URL: z.string().default('localhost:9092'),
   JWT_SECRET: z.string().min(32),

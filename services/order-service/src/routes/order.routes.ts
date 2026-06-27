@@ -127,7 +127,7 @@ router.delete('/:id/items/:itemId', async (req, res, next) => {
       z.object({ id: z.string().uuid(), itemId: z.string().uuid() }),
       req.params,
     );
-    await orderService.removeOrderItem(id, itemId, req.user!.sub);
+    await orderService.removeOrderItem(id, itemId);
     res.json(successResponse(null, 'Item removed'));
   } catch (err) {
     next(err);

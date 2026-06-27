@@ -48,9 +48,13 @@ async function migrate(): Promise<void> {
         recommended_staff_count INTEGER NOT NULL,
         confidence NUMERIC(3,2),
         rationale TEXT,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        INDEX ON (store_id, recommendation_date)
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_shift_recommendations_store_date
+        ON shift_recommendations(store_id, recommendation_date);
     `);
 
     await client.query(`
@@ -62,9 +66,13 @@ async function migrate(): Promise<void> {
         message TEXT NOT NULL,
         severity VARCHAR(20) NOT NULL CHECK (severity IN ('info', 'warning', 'critical')),
         acknowledged BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        INDEX ON (store_id, alert_date, severity)
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_staffing_alerts_store_date_severity
+        ON staffing_alerts(store_id, alert_date, severity);
     `);
 
     console.info('[Migration] Completed successfully');

@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const configSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().default(3004),
+  PORT: z.coerce.number().default(Number(process.env.AUTH_SERVICE_PORT ?? process.env.PORT ?? 3004)),
   AUTH_DB_URL: z.string().min(1),
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default('15m'),

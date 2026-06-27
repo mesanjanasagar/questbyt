@@ -1,10 +1,8 @@
-import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
-import { validateOrThrow } from '@pos/shared-utils';
+import express, { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import * as scoringService from '../services/scoring.service';
 
-const router = Router();
+export const router: express.Router = Router();
 
 // Get churn scores for a store
 router.get('/scores', authenticate, async (req: Request, res: Response, next: NextFunction) => {

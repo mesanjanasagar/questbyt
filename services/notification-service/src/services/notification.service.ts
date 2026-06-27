@@ -1,4 +1,4 @@
-import { sendNotification } from '../channels/adapters';
+import { sendNotification } from '../channels/adapter';
 import type { DomainEvent } from '@pos/shared-types';
 
 // ───────────────────────────────────────────

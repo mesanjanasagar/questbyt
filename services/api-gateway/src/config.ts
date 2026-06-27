@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 const configSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().default(3000),
+  PORT: z.coerce.number().default(Number(process.env.API_GATEWAY_PORT ?? process.env.PORT ?? 3000)),
 
   // Service URLs
   AUTH_SERVICE_URL: z.string().default('http://localhost:3004'),
@@ -18,7 +18,7 @@ const configSchema = z.object({
   SYNC_SERVICE_URL: z.string().default('http://localhost:3006'),
   CHURN_SERVICE_URL: z.string().default('http://localhost:3009'),
   RESERVATION_SERVICE_URL: z.string().default('http://localhost:3010'),
-  AI_MANAGER_SERVICE_URL: z.string().default('http://localhost:3012'),
+  AI_MANAGER_SERVICE_URL: z.string().default('http://localhost:3009'),
 
   JWT_SECRET: z.string().min(32),
   REDIS_URL: z.string().default('redis://localhost:6379'),

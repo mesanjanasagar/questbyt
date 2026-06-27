@@ -1,16 +1,16 @@
-import express from 'express';
+import express, { Express } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import proxy from 'express-http-proxy';
 import { config } from './config';
-import { errorHandler } from './middleware/errorHandler';
+import { errorHandler } from './middleware/errorhandler';
 import { authenticate, optionalAuthenticate } from './middleware/authenticate';
-import { requestLogger } from './middleware/requestLogger';
+import { requestLogger } from './middleware/requestlogger';
 import { getServiceTarget, injectCorrelationId } from './utils/proxy';
 
-export const app = express();
+export const app: Express = express();
 
 // Helmet for security
 app.use(helmet());
@@ -62,15 +62,15 @@ app.get('/health', (_req, res) => {
 });
 
 // Auth routes (public)
-app.use('/api/v1/auth', optionalAuthenticate, (req, res, next) => {
+app.use('/api/v1/auth', optionalAuthenticate, (req: any, res, next) => {
   injectCorrelationId(req);
   proxy(config.AUTH_SERVICE_URL, {
-    proxyReqPathResolver: (req) => req.path.replace(/^\/api\/v1/, ''),
+    proxyReqPathResolver: (req: any) => req.path.replace(/^\/api\/v1/, ''),
   })(req, res, next);
 });
 
 // All other routes (authenticated)
-app.use('/api/v1', authenticate, (req, res, next) => {
+app.use('/api/v1', authenticate, (req: any, res, next) => {
   injectCorrelationId(req);
 
   const target = getServiceTarget(req);
@@ -80,9 +80,8 @@ app.use('/api/v1', authenticate, (req, res, next) => {
   }
 
   const serviceProxy = proxy(target, {
-    proxyReqPathResolver: (req) => req.path,
-    userResHeaderDecorator: (headers, userReq) => {
-      headers['x-gateway-forwarded'] = 'true';
+      proxyReqPathResolver: (req: any) => req.path,
+      userResHeaderDecorator: (headers: any, userReq: any) => {
       headers['x-correlation-id'] = userReq.correlationId || '';
       return headers;
     },

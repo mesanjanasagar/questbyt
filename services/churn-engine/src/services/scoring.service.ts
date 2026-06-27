@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import axios from 'axios';
 import { config } from '../config';
-import { executeQuery, executeQuerySingle } from '../db/client';
+import { executeQuery } from '../db/clients';
 
 export interface ChurnScore {
   id: string;
@@ -79,9 +79,9 @@ async function calculateChurnScore(customer: any, storeId: string): Promise<Chur
     const threeMonthsAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
     const sixMonthsAgo = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
 
-    const recent = orderList.filter(o => new Date(o.createdAt) > threeMonthsAgo).length;
+    const recent = orderList.filter((o: any) => new Date(o.createdAt) > threeMonthsAgo).length;
     const older = orderList.filter(
-      o => new Date(o.createdAt) > sixMonthsAgo && new Date(o.createdAt) <= threeMonthsAgo
+      (o: any) => new Date(o.createdAt) > sixMonthsAgo && new Date(o.createdAt) <= threeMonthsAgo
     ).length;
 
     const frequencyTrend = older > 0 ? ((recent - older) / older) : 0;
@@ -90,15 +90,15 @@ async function calculateChurnScore(customer: any, storeId: string): Promise<Chur
     const recentAvg =
       recent > 0
         ? orderList
-            .filter(o => new Date(o.createdAt) > threeMonthsAgo)
-            .reduce((sum, o) => sum + (o.totalAmount || 0), 0) / recent
+            .filter((o: any) => new Date(o.createdAt) > threeMonthsAgo)
+            .reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0) / recent
         : 0;
 
     const olderAvg =
       older > 0
         ? orderList
-            .filter(o => new Date(o.createdAt) > sixMonthsAgo && new Date(o.createdAt) <= threeMonthsAgo)
-            .reduce((sum, o) => sum + (o.totalAmount || 0), 0) / older
+            .filter((o: any) => new Date(o.createdAt) > sixMonthsAgo && new Date(o.createdAt) <= threeMonthsAgo)
+            .reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0) / older
         : 0;
 
     const avgOrderValueTrend = olderAvg > 0 ? ((recentAvg - olderAvg) / olderAvg) : 0;

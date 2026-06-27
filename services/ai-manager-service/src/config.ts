@@ -2,12 +2,12 @@ import { z } from 'zod';
 
 const configSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().default(3009),
+  PORT: z.coerce.number().default(Number(process.env.AI_MANAGER_SERVICE_PORT ?? process.env.PORT ?? 3009)),
   JWT_SECRET: z.string().min(32),
   // Downstream service URLs
   REPORTING_SERVICE_URL: z.string().default('http://localhost:3008'),
   CUSTOMER_SERVICE_URL: z.string().default('http://localhost:3006'),
-  MARKETING_SERVICE_URL: z.string().default('http://localhost:3007'),
+  MARKETING_SERVICE_URL: z.string().default('http://localhost:3014'),
   INVENTORY_SERVICE_URL: z.string().default('http://localhost:3002'),
   // WhatsApp Business API
   WHATSAPP_TOKEN: z.string().default(''),

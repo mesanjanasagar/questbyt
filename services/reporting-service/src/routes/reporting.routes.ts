@@ -24,11 +24,12 @@ router.get('/revenue', async (req, res, next) => {
       }),
       req.query,
     );
+    const period = (query.period ?? 'day') as 'day' | 'week' | 'month';
     const report = await reportingService.getRevenueReport(
       query.storeId,
       query.from,
       query.to,
-      query.period,
+      period,
     );
     res.json(successResponse(report));
   } catch (err) {
@@ -61,7 +62,8 @@ router.get('/daily', async (req, res, next) => {
       }),
       req.query,
     );
-    const snapshots = await reportingService.getDailySnapshots(query.storeId, query.days);
+    const days = Number(query.days ?? 30);
+    const snapshots = await reportingService.getDailySnapshots(query.storeId, days);
     res.json(successResponse(snapshots));
   } catch (err) {
     next(err);
@@ -78,12 +80,14 @@ router.get('/top-items', async (req, res, next) => {
       }),
       req.query,
     );
+    const limit = Number(query.limit ?? 10);
+    const sortBy = (query.sortBy ?? 'revenue') as 'revenue' | 'quantity';
     const items = await reportingService.getTopItems(
       query.storeId,
       query.from,
       query.to,
-      query.limit,
-      query.sortBy,
+      limit,
+      sortBy,
     );
     res.json(successResponse(items));
   } catch (err) {

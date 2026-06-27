@@ -216,16 +216,19 @@ export async function addOrderItem(
   }
 
   const itemId = generateId();
-  const totalPrice = req.unitPrice * req.quantity;
 
   await db.query(
     `INSERT INTO order_items (id, order_id, menu_item_id, quantity, unit_price, total_price, modifications, notes)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
     [
-      itemId, orderId, item.menuItemId, item.quantity,
-      item.unitPrice, item.totalPrice,
-      item.modifications ? JSON.stringify(item.modifications) : null,
-      item.notes ?? null,
+      itemId,
+      orderId,
+      req.menuItemId,
+      req.quantity,
+      req.unitPrice,
+      req.unitPrice * req.quantity,
+      req.modifications ? JSON.stringify(req.modifications) : null,
+      req.notes ?? null,
     ],
   );
 
@@ -234,6 +237,12 @@ export async function addOrderItem(
 
   const itemResult = await db.query(`SELECT * FROM order_items WHERE id = $1`, [itemId]);
   const item = rowToOrderItem(itemResult.rows[0]);
+
+  await writeAudit(db as unknown as PoolClient, orderId, 'item_added', {
+    itemId,
+    menuItemId: req.menuItemId,
+    quantity: req.quantity,
+  }, actorId);
 
   publishEvent('order.item_added', order.rows[0].store_id, orderId, 'Order', {
     itemId,
@@ -251,7 +260,6 @@ export async function addOrderItem(
 export async function removeOrderItem(
   orderId: string,
   itemId: string,
-  actorId: string,
 ): Promise<void> {
   const order = await db.query(`SELECT * FROM orders WHERE id = $1 AND status IN ('pending')`, [orderId]);
   if (order.rowCount === 0) {
@@ -286,14 +294,19 @@ export async function markOrderPaid(
     [req.paymentStatus, req.paymentMethod, orderId],
   );
 
-  publishEvent('payment.processed', existing.rows[0].store_id, orderId, 'Order', {
+  if (result.rowCount === 0) {
+    throw new NotFoundError(`Order ${orderId} not found`);
+  }
+
+  const order = result.rows[0];
+  publishEvent('payment.processed', order.store_id, orderId, 'Order', {
     orderId,
     paymentId: req.paymentId,
     paymentMethod: req.paymentMethod,
     paymentStatus: req.paymentStatus,
   }).catch(console.error);
 
-  return rowToOrder(result.rows[0]);
+  return rowToOrder(order);
 }
 
 // ───────────────────────────────────────────
@@ -309,7 +322,7 @@ export async function cancelOrder(
   if (!existing.rowCount || existing.rowCount === 0) throw new NotFoundError(`Order ${orderId} not found`);
 
   const prev = existing.rows[0];
-  if (!'completed', 'cancelled'].includes(prev.status)) {
+  if ([OrderStatus.COMPLETED, OrderStatus.CANCELLED].includes(prev.status as OrderStatus)) {
     throw new ValidationError(`Cannot cancel an order with status: ${prev.status}`);
   }
 
@@ -414,7 +427,8 @@ function rowToOrderItem(row: Record<string, unknown>): OrderItem {
     unitPrice: parseFloat(row.unit_price as string),
     totalPrice: parseFloat(row.total_price as string),
     modifications: row.modifications as import('@pos/shared-types').OrderItemModification[] | undefined,
-    notes: row.notes as import('@pos/shared-types').OrderItemStatus,
+    notes: row.notes as string | undefined,
+    status: row.status as import('@pos/shared-types').OrderItemStatus,
     createdAt: row.created_at as string,
   };
 }

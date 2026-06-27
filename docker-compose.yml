@@ -418,7 +418,8 @@ services:
   # sync-service (Port 3006) - pnpm services:sync
   # churn-engine (Port 3009) - pnpm services:churn
   # reservation-service (Port 3010) - pnpm services:reservation
-  # staff-optimization-service (Port 3011) - pnpm services:staff
+
+  # staff-optimization-service (Port 3015) - pnpm services:staff
 
   # ————————————————————————————————————————
   # pgAdmin - Postgres UI for development

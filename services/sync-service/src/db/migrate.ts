@@ -25,10 +25,18 @@ async function migrate(): Promise<void> {
         synced_at TIMESTAMPTZ,
         status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'syncing', 'synced', 'failed')),
         error_message TEXT,
-        retry_count INTEGER DEFAULT 0,
-        INDEX ON (device_id, status, created_at),
-        INDEX ON (store_id, synced_at)
+        retry_count INTEGER DEFAULT 0
       );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_sync_queue_device_status_created
+        ON sync_queue(device_id, status, created_at);
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_sync_queue_store_synced
+        ON sync_queue(store_id, synced_at);
     `);
 
     // Reconciliation Log
@@ -44,9 +52,13 @@ async function migrate(): Promise<void> {
         resolved_state JSONB,
         resolution_strategy VARCHAR(50) NOT NULL,
         created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        resolved_at TIMESTAMPTZ,
-        INDEX ON (device_id, store_id, created_at)
+        resolved_at TIMESTAMPTZ
       );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_reconciliation_logs_device_store_created
+        ON reconciliation_logs(device_id, store_id, created_at);
     `);
 
     // Conflict Resolutions
@@ -60,9 +72,13 @@ async function migrate(): Promise<void> {
         remote_value JSONB,
         resolved_value JSONB NOT NULL,
         resolution_method VARCHAR(50) NOT NULL,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        INDEX ON (reconciliation_log_id, conflict_type)
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_conflict_resolutions_log_conflict
+        ON conflict_resolutions(reconciliation_log_id, conflict_type);
     `);
 
     // Deduplication Table (idempotency)
@@ -70,9 +86,13 @@ async function migrate(): Promise<void> {
       CREATE TABLE IF NOT EXISTS sync_idempotency (
         idempotency_key VARCHAR(255) PRIMARY KEY,
         response JSONB NOT NULL,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        INDEX ON (created_at)
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_sync_idempotency_created_at
+        ON sync_idempotency(created_at);
     `);
 
     console.info('[Migration] Completed successfully');

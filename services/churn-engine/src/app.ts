@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Express } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import morgan from 'morgan';
@@ -6,7 +6,7 @@ import rateLimit from 'express-rate-limit';
 import churnRoutes from './routes/churn.routes';
 import { errorHandler } from './middleware/errorHandler';
 
-export const app = express();
+export const app: Express = express();
 
 app.use(helmet());
 app.use(cors({

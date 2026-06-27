@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { app } from './app';
-import { connectDb, disconnectDb } from './db/client';
-import { startScoringJob, stopScoringJob } from './jobs/scoring.job';
+import { connectDb, disconnectDb } from './db/clients';
+import { startScoringJob, stopScoringJob } from './jobs/scoring.jobs';
 import { config } from './config';
 
 async function bootstrap(): Promise<void> {
