@@ -256,7 +256,8 @@ POST   /api/v1/churn/score        - Manual trigger daily scoring
 
  
 
-### ⏳ Staff Optimization Service (Port 3011) — SCAFFOLDING PENDING
+### ⏳ Staff Optimization Service (Port 
+) — SCAFFOLDING PENDING
 
 **Status:** Directory created, files pending
 

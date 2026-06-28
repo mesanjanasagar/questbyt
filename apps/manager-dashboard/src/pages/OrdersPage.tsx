@@ -1,5 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { dashboardAPI } from '../api/dashboard';
+import { useEffect, useState, useCallback } from 'react';
+import {
+  PageHeader, Card, CardBody, StatusBadge, Badge, Table, EmptyState,
+  ReceiptIcon,
+} from '@pos/ui';
+import type { Column } from '@pos/ui';
+import api from '../api/client';
 import { useDashboardStore } from '../store/dashboardStore';
 
 interface Order {
@@ -12,13 +17,52 @@ interface Order {
   createdAt: string;
 }
 
-const STATUS_BADGE: Record<string, string> = {
-  pending: 'bg-gray-100 text-gray-700',
-  'in-progress': 'bg-blue-100 text-blue-800',
-  ready: 'bg-green-100 text-green-800',
-  delivered: 'bg-teal-100 text-teal-800',
-  cancelled: 'bg-red-100 text-red-800',
-};
+const STATUS_FILTERS = ['all', 'pending', 'in-progress', 'ready', 'delivered', 'cancelled'];
+
+const columns: Column<Order>[] = [
+  {
+    key: 'number',
+    header: 'Order',
+    cell: (o) => (
+      <span className="font-bold text-neutral-900 font-mono">#{o.orderNumber}</span>
+    ),
+  },
+  {
+    key: 'type',
+    header: 'Type',
+    cell: (o) => (
+      <span className="capitalize text-neutral-600 text-xs font-medium">{o.orderType}</span>
+    ),
+  },
+  {
+    key: 'status',
+    header: 'Status',
+    cell: (o) => <StatusBadge status={o.status} />,
+  },
+  {
+    key: 'items',
+    header: 'Items',
+    headerClassName: 'text-right',
+    className: 'text-right tabular-nums',
+    cell: (o) => o.itemCount,
+  },
+  {
+    key: 'total',
+    header: 'Total',
+    headerClassName: 'text-right',
+    className: 'text-right font-semibold text-neutral-800 tabular-nums',
+    cell: (o) => `$${o.totalAmount.toFixed(2)}`,
+  },
+  {
+    key: 'time',
+    header: 'Time',
+    cell: (o) => (
+      <span className="text-neutral-500 text-xs">
+        {new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+      </span>
+    ),
+  },
+];
 
 export const OrdersPage: React.FC = () => {
   const { selectedStoreId } = useDashboardStore();
@@ -28,14 +72,14 @@ export const OrdersPage: React.FC = () => {
 
   const load = useCallback(async () => {
     try {
-      const res = await import('../api/client').then((m) => m.default.get('/orders', {
+      const res = await api.get('/orders', {
         params: {
           storeId: selectedStoreId || undefined,
           status: statusFilter !== 'all' ? statusFilter : undefined,
           limit: 100,
         },
-      }));
-      setOrders(res.data.data ?? []);
+      });
+      setOrders((res.data as { data: Order[] }).data ?? []);
     } catch (err) {
       console.error('Failed to load orders:', err);
     } finally {
@@ -56,76 +100,52 @@ export const OrdersPage: React.FC = () => {
 
   return (
     <div className="p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-800">Live Orders</h2>
-        <div className="flex gap-2 text-sm">
-          <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full font-semibold">
-            {counts['in-progress'] ?? 0} In Progress
-          </span>
-          <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full font-semibold">
-            {counts['ready'] ?? 0} Ready
-          </span>
-          <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full font-semibold">
-            {counts['pending'] ?? 0} Pending
-          </span>
-        </div>
-      </div>
+      <PageHeader
+        title="Live Orders"
+        description="Real-time order feed — refreshes every 10 seconds"
+        actions={
+          <div className="flex items-center gap-2">
+            <Badge variant="info">{counts['in-progress'] ?? 0} In Progress</Badge>
+            <Badge variant="success">{counts['ready'] ?? 0} Ready</Badge>
+            <Badge variant="default">{counts['pending'] ?? 0} Pending</Badge>
+          </div>
+        }
+      />
 
-      {/* Status filter */}
-      <div className="flex gap-2 flex-wrap">
-        {['all', 'pending', 'in-progress', 'ready', 'delivered', 'cancelled'].map((s) => (
+      {/* Status filter tabs */}
+      <div className="flex gap-1.5 flex-wrap">
+        {STATUS_FILTERS.map((s) => (
           <button
             key={s}
             onClick={() => setStatusFilter(s)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold capitalize transition-colors ${
               statusFilter === s
-                ? 'bg-blue-600 text-white'
-                : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                ? 'bg-primary-600 text-white'
+                : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'
             }`}
           >
-            {s}
+            {s === 'all' ? `All (${orders.length})` : `${s} (${counts[s] ?? 0})`}
           </button>
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-200">
-            <tr>
-              <th className="text-left px-5 py-3 font-semibold text-gray-600">Order #</th>
-              <th className="text-left px-5 py-3 font-semibold text-gray-600">Type</th>
-              <th className="text-left px-5 py-3 font-semibold text-gray-600">Status</th>
-              <th className="text-right px-5 py-3 font-semibold text-gray-600">Items</th>
-              <th className="text-right px-5 py-3 font-semibold text-gray-600">Total</th>
-              <th className="text-left px-5 py-3 font-semibold text-gray-600">Time</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {loading ? (
-              <tr><td colSpan={6} className="text-center py-10 text-gray-400">Loading...</td></tr>
-            ) : orders.length === 0 ? (
-              <tr><td colSpan={6} className="text-center py-10 text-gray-400">No orders found</td></tr>
-            ) : (
-              orders.map((order) => (
-                <tr key={order.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-5 py-3 font-bold text-gray-900">#{order.orderNumber}</td>
-                  <td className="px-5 py-3 capitalize text-gray-600">{order.orderType}</td>
-                  <td className="px-5 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${STATUS_BADGE[order.status] ?? 'bg-gray-100 text-gray-700'}`}>
-                      {order.status}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3 text-right text-gray-700">{order.itemCount}</td>
-                  <td className="px-5 py-3 text-right font-medium text-gray-800">${order.totalAmount.toFixed(2)}</td>
-                  <td className="px-5 py-3 text-sm text-gray-500">
-                    {new Date(order.createdAt).toLocaleTimeString()}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <Card>
+        <CardBody padding="none">
+          <Table
+            columns={columns}
+            data={orders}
+            keyExtractor={(o) => o.id}
+            loading={loading}
+            emptyState={
+              <EmptyState
+                icon={<ReceiptIcon size={20} />}
+                title="No orders found"
+                description="Orders will appear here as they come in"
+              />
+            }
+          />
+        </CardBody>
+      </Card>
     </div>
   );
 };

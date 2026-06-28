@@ -1,14 +1,17 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { resolve } from 'path';
 
 export default defineConfig({
-  // @pos/shared-types is a CommonJS workspace package. Force Vite to pre-bundle
-  // it so esbuild converts its `export *` re-exports into statically-analyzable
-  // ESM named exports (e.g. the DeviceType enum). Without this, Vite serves the
-  // raw CJS and the browser can't resolve named exports.
-  optimizeDeps: {
-    include: ['@pos/shared-types'],
+  resolve: {
+    // Point @pos/shared-types at its TypeScript source so both dev (esbuild)
+    // and production (Rollup) process it as ESM. This avoids Rollup's inability
+    // to statically analyze the CJS __exportStar(require('./enums'), exports)
+    // pattern that tsc emits in the dist.
+    alias: {
+      '@pos/shared-types': resolve(__dirname, '../../packages/shared-types/src/index.ts'),
+    },
   },
   plugins: [
     react(),

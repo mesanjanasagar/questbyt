@@ -12,6 +12,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@pos/ui": "workspace:*",
+    "@pos/tailwind-config": "workspace:*",
     "@pos/shared-types": "workspace:*",
     "@tanstack/react-query": "^5.28.0",
     "@tanstack/react-query-devtools": "^5.28.0",

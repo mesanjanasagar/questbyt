@@ -1,9 +1,29 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-html, body {
-  overscroll-behavior: none;
-  touch-action: manipulation;
-  user-select: none;
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html {
+    height: 100%;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    height: 100%;
+    /* Kiosk: no scrolling past edges, no accidental selection */
+    overscroll-behavior: none;
+    touch-action: manipulation;
+    user-select: none;
+    @apply bg-neutral-50 text-neutral-900 font-sans text-base;
+  }
+
+  #root { height: 100%; }
+
+  :focus { outline: none; }
+  :focus-visible { @apply ring-2 ring-primary-500 ring-offset-2; outline: none; }
 }

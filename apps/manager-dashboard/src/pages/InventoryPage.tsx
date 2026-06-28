@@ -1,4 +1,8 @@
 import React, { useEffect } from 'react';
+import {
+  PageHeader, KPICard, Card, CardBody, Badge, EmptyState, CheckCircleIcon,
+  PackageIcon, AlertTriangleIcon,
+} from '@pos/ui';
 import { useDashboardStore } from '../store/dashboardStore';
 import { dashboardAPI } from '../api/dashboard';
 import { formatDistanceToNow } from 'date-fns';
@@ -18,61 +22,88 @@ export const InventoryPage: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <h2 className="text-2xl font-bold text-gray-800">Inventory Alerts</h2>
+      <PageHeader
+        title="Inventory Alerts"
+        description="Items requiring immediate attention"
+      />
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-red-50 border-2 border-red-200 rounded-xl p-5">
-          <p className="text-sm font-semibold text-red-600 uppercase">Out of Stock</p>
-          <p className="text-4xl font-bold text-red-700 mt-1">{outOfStock.length}</p>
-        </div>
-        <div className="bg-yellow-50 border-2 border-yellow-200 rounded-xl p-5">
-          <p className="text-sm font-semibold text-yellow-600 uppercase">Low Stock</p>
-          <p className="text-4xl font-bold text-yellow-700 mt-1">{lowStock.length}</p>
-        </div>
+        <KPICard
+          label="Out of Stock"
+          value={outOfStock.length}
+          icon={<PackageIcon size={18} />}
+          iconColor="text-error-600 bg-error-50"
+          subValue={outOfStock.length === 0 ? 'All clear' : 'Requires urgent restock'}
+        />
+        <KPICard
+          label="Low Stock"
+          value={lowStock.length}
+          icon={<AlertTriangleIcon size={18} />}
+          iconColor="text-warning-600 bg-warning-50"
+          subValue={lowStock.length === 0 ? 'All clear' : 'Monitor closely'}
+        />
       </div>
 
       {inventoryAlerts.length === 0 ? (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-8 text-center">
-          <p className="text-2xl mb-2">✅</p>
-          <p className="text-green-800 font-semibold">All inventory levels healthy</p>
-        </div>
+        <Card>
+          <CardBody>
+            <EmptyState
+              icon={<CheckCircleIcon size={20} className="text-success-600" />}
+              title="All inventory levels healthy"
+              description="No items require attention right now"
+            />
+          </CardBody>
+        </Card>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-5 py-3 font-semibold text-gray-600">Product</th>
-                <th className="text-left px-5 py-3 font-semibold text-gray-600">Status</th>
-                <th className="text-right px-5 py-3 font-semibold text-gray-600">Current Stock</th>
-                <th className="text-right px-5 py-3 font-semibold text-gray-600">Reorder Level</th>
-                <th className="text-left px-5 py-3 font-semibold text-gray-600">Alert Age</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {inventoryAlerts.map((alert) => (
-                <tr key={alert.id} className="hover:bg-gray-50">
-                  <td className="px-5 py-4 font-medium text-gray-900">{alert.productName}</td>
-                  <td className="px-5 py-4">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        alert.status === 'out_of_stock'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}
+        <Card>
+          <CardBody padding="none">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-neutral-200">
+                    {['Product', 'Status', 'Current Stock', 'Reorder Level', 'Alert Age'].map((h, i) => (
+                      <th
+                        key={h}
+                        className={`py-3 px-4 text-xs font-semibold text-neutral-500 uppercase tracking-wide ${
+                          i >= 2 && i <= 3 ? 'text-right' : 'text-left'
+                        }`}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {inventoryAlerts.map((alert) => (
+                    <tr
+                      key={alert.id}
+                      className="border-b border-neutral-50 last:border-0 hover:bg-neutral-50 transition-colors"
                     >
-                      {alert.status === 'out_of_stock' ? 'Out of Stock' : 'Low Stock'}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4 text-right font-bold text-gray-900">{alert.currentStock}</td>
-                  <td className="px-5 py-4 text-right text-gray-500">{alert.reorderLevel}</td>
-                  <td className="px-5 py-4 text-sm text-gray-500">
-                    {formatDistanceToNow(new Date(alert.createdAt), { addSuffix: true })}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                      <td className="py-3.5 px-4 font-medium text-neutral-900">{alert.productName}</td>
+                      <td className="py-3.5 px-4">
+                        <Badge
+                          variant={alert.status === 'out_of_stock' ? 'error' : 'warning'}
+                          dot
+                        >
+                          {alert.status === 'out_of_stock' ? 'Out of Stock' : 'Low Stock'}
+                        </Badge>
+                      </td>
+                      <td className="py-3.5 px-4 text-right font-bold text-neutral-900 tabular-nums">
+                        {alert.currentStock}
+                      </td>
+                      <td className="py-3.5 px-4 text-right text-neutral-500 tabular-nums">
+                        {alert.reorderLevel}
+                      </td>
+                      <td className="py-3.5 px-4 text-xs text-neutral-400">
+                        {formatDistanceToNow(new Date(alert.createdAt), { addSuffix: true })}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardBody>
+        </Card>
       )}
     </div>
   );

@@ -35,9 +35,18 @@ importers:
 
   apps/crm-dashboard:
     dependencies:
+      '@pos/tailwind-config':
+        specifier: workspace:*
+        version: link:../../packages/tailwind-config
+      '@pos/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       axios:
         specifier: ^1.6.0
         version: 1.18.0
+      clsx:
+        specifier: ^2.1.0
+        version: 2.1.1
       date-fns:
         specifier: ^2.30.0
         version: 2.30.0
@@ -53,6 +62,9 @@ importers:
       recharts:
         specifier: ^2.12.0
         version: 2.15.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      tailwind-merge:
+        specifier: ^2.2.0
+        version: 2.6.1
       zustand:
         specifier: ^4.4.0
         version: 4.5.7(@types/react@18.3.31)(react@18.3.1)
@@ -87,9 +99,18 @@ importers:
 
   apps/kds:
     dependencies:
+      '@pos/tailwind-config':
+        specifier: workspace:*
+        version: link:../../packages/tailwind-config
+      '@pos/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       axios:
         specifier: ^1.6.0
         version: 1.18.0
+      clsx:
+        specifier: ^2.1.0
+        version: 2.1.1
       date-fns:
         specifier: ^2.30.0
         version: 2.30.0
@@ -99,6 +120,9 @@ importers:
       react-dom:
         specifier: ^18.2.0
         version: 18.3.1(react@18.3.1)
+      tailwind-merge:
+        specifier: ^2.2.0
+        version: 2.6.1
       zustand:
         specifier: ^4.4.0
         version: 4.5.7(@types/react@18.3.31)(react@18.3.1)
@@ -133,15 +157,27 @@ importers:
 
   apps/kiosk:
     dependencies:
+      '@pos/tailwind-config':
+        specifier: workspace:*
+        version: link:../../packages/tailwind-config
+      '@pos/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       axios:
         specifier: ^1.6.0
         version: 1.18.0
+      clsx:
+        specifier: ^2.1.0
+        version: 2.1.1
       react:
         specifier: ^18.2.0
         version: 18.3.1
       react-dom:
         specifier: ^18.2.0
         version: 18.3.1(react@18.3.1)
+      tailwind-merge:
+        specifier: ^2.2.0
+        version: 2.6.1
       zustand:
         specifier: ^4.4.0
         version: 4.5.7(@types/react@18.3.31)(react@18.3.1)
@@ -176,9 +212,18 @@ importers:
 
   apps/manager-dashboard:
     dependencies:
+      '@pos/tailwind-config':
+        specifier: workspace:*
+        version: link:../../packages/tailwind-config
+      '@pos/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       axios:
         specifier: ^1.6.0
         version: 1.18.0
+      clsx:
+        specifier: ^2.1.0
+        version: 2.1.1
       date-fns:
         specifier: ^2.30.0
         version: 2.30.0
@@ -194,6 +239,9 @@ importers:
       recharts:
         specifier: ^2.12.0
         version: 2.15.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      tailwind-merge:
+        specifier: ^2.2.0
+        version: 2.6.1
       zustand:
         specifier: ^4.4.0
         version: 4.5.7(@types/react@18.3.31)(react@18.3.1)
@@ -301,6 +349,12 @@ importers:
       '@pos/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
+      '@pos/tailwind-config':
+        specifier: workspace:*
+        version: link:../../packages/tailwind-config
+      '@pos/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@tanstack/react-query':
         specifier: ^5.28.0
         version: 5.101.0(react@18.3.1)
@@ -381,6 +435,36 @@ importers:
       '@types/uuid':
         specifier: ^9.0.0
         version: 9.0.8
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+
+  packages/tailwind-config: {}
+
+  packages/ui:
+    dependencies:
+      clsx:
+        specifier: ^2.1.0
+        version: 2.1.1
+      react:
+        specifier: '>=18.0.0'
+        version: 18.3.1
+      react-dom:
+        specifier: '>=18.0.0'
+        version: 18.3.1(react@18.3.1)
+      tailwind-merge:
+        specifier: ^2.2.0
+        version: 2.6.1
+    devDependencies:
+      '@types/react':
+        specifier: ^18.3.0
+        version: 18.3.31
+      '@types/react-dom':
+        specifier: ^18.3.0
+        version: 18.3.7(@types/react@18.3.31)
+      react-router-dom:
+        specifier: ^6.22.0
+        version: 6.30.4(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       typescript:
         specifier: ^5.4.0
         version: 5.9.3

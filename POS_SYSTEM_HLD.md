@@ -1,10 +1,4 @@
-Gmail	Sanjana Sagar <123sanjanasagar@gmail.com>
-(no subject)
-Sanjana Sagar (Technology) <SanjanaSA@emiratesnbd.com>	24 June 2026 at 16:33
-To: "123sanjanasagar@gmail.com" <123sanjanasagar@gmail.com>
 # POS System with Inventory Management - High Level Design (HLD)
-
- 
 
 **Document Version:** 1.0 
 
@@ -19,9 +13,6 @@ To: "123sanjanasagar@gmail.com" <123sanjanasagar@gmail.com>
  
 
 ## 1. Executive Summary
-
- 
-
 This document outlines the High-Level Design for a modern, scalable POS (Point of Sale) system with integrated inventory management supporting multiple devices (POS terminals, Kitchen Display Systems, mobile apps, dashboards). The architecture follows event-driven microservices patterns with offline-first capability for resilience.
 
  
@@ -36,9 +27,7 @@ This document outlines the High-Level Design for a modern, scalable POS (Point o
 
 ### 2.1 Scope & Goals
 
- 
-
-**In Scope:**
+ **In Scope:**
 
 - Multi-device POS operations (terminal, KDS, mobile, dashboard)
 
@@ -68,7 +57,6 @@ This document outlines the High-Level Design for a modern, scalable POS (Point o
 
 ### 2.2 Key Requirements
 
- 
 
 | Requirement | Priority | Description |
 
@@ -87,10 +75,6 @@ This document outlines the High-Level Design for a modern, scalable POS (Point o
 | Consistency | High | Strong consistency for inventory |
 
 | Performance | High | <200ms API response time |
-
- 
-
----
 
  
 
