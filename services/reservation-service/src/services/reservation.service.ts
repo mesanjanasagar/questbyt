@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import axios from 'axios';
 import { config } from '../config';
-import { executeQuery, executeQuerySingle, executeTransaction } from '../db/client';
+import { executeQuery, executeTransaction } from '../db/client';
 import { PoolClient } from 'pg';
 
 export interface Reservation {

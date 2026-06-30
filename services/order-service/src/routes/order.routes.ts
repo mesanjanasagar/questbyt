@@ -1,11 +1,11 @@
-import { Router } from 'express';
+import { Router, type IRouter } from 'express';
 import { z } from 'zod';
 import * as orderService from '../services/order.service';
 import { authenticate, requirePermission } from '../middleware/authenticate';
 import { validateOrThrow, successResponse } from '@pos/shared-utils';
 import { OrderType, OrderStatus, Platform } from '@pos/shared-types';
 
-const router = Router();
+const router: IRouter = Router();
 
 router.use(authenticate);
 

@@ -41,6 +41,10 @@ export const SERVICE_ROUTES: ServiceRoute[] = [
 
   // Store
   { path: '/api/v1/stores', target: config.STORE_SERVICE_URL },
+  { path: '/api/v1/branches', target: config.STORE_SERVICE_URL },
+  { path: '/api/v1/tables', target: config.STORE_SERVICE_URL },
+  { path: '/api/v1/onboarding', target: config.STORE_SERVICE_URL },
+  { path: '/api/v1/staff', target: config.STORE_SERVICE_URL },
 
   // Notifications
   { path: '/api/v1/notifications', target: config.NOTIFICATION_SERVICE_URL },
@@ -59,7 +63,7 @@ export const SERVICE_ROUTES: ServiceRoute[] = [
 ];
 
 export function getServiceTarget(req: Request): string | null {
-  const path = req.path;
+  const path = req.originalUrl.split('?')[0];
 
   for (const route of SERVICE_ROUTES) {
     if (path.startsWith(route.path)) {

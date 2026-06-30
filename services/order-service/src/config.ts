@@ -7,6 +7,9 @@ const configSchema = z.object({
   REDIS_URL: z.string().default('redis://localhost:6379'),
   KAFKA_BROKER_URL: z.string().default('localhost:9092'),
   JWT_SECRET: z.string().min(32),
+  MENU_SERVICE_URL: z.string().default('http://localhost:3005'),
+  INVENTORY_SERVICE_URL: z.string().default('http://localhost:3002'),
+  INTERNAL_SERVICE_SECRET: z.string().default('internal-secret-change-in-prod'),
 });
 
 const parsed = configSchema.safeParse(process.env);

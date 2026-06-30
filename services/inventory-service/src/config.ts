@@ -7,6 +7,7 @@ const configSchema = z.object({
   KAFKA_BROKER_URL: z.string().default('localhost:9092'),
   JWT_SECRET: z.string().min(32),
   ORDER_SERVICE_URL: z.string().default('http://localhost:3001'),
+  INTERNAL_SERVICE_SECRET: z.string().default('internal-secret-change-in-prod'),
 });
 
 const parsed = configSchema.safeParse(process.env);

@@ -24,9 +24,11 @@ const configSchema = z.object({
   REDIS_URL: z.string().default('redis://localhost:6379'),
   ALLOWED_ORIGINS: z.string().default('http://localhost:5173,http://localhost:5000,http://localhost:5001,http://localhost:5002,http://localhost:5003,http://localhost:5004'),
 
-  // Rate limiting
+  // Rate limiting (high in dev, enforce in production)
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000),
-  RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(300),
+  RATE_LIMIT_MAX_REQUESTS: z.coerce.number().default(
+    process.env.NODE_ENV === 'production' ? 300 : 10000,
+  ),
 });
 
 const parsed = configSchema.safeParse(process.env);

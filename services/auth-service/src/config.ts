@@ -10,6 +10,7 @@ const configSchema = z.object({
   REFRESH_TOKEN_EXPIRES_IN: z.string().default('7d'),
   REDIS_URL: z.string().default('redis://localhost:6379'),
   BCRYPT_ROUNDS: z.coerce.number().default(12),
+  INTERNAL_SERVICE_SECRET: z.string().default('internal-secret-change-in-prod'),
 });
 
 const parsed = configSchema.safeParse(process.env);

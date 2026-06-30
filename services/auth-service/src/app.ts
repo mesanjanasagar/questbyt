@@ -1,12 +1,13 @@
-import express from 'express';
+import express, { Express } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import authRoutes from './routes/auth.routes';
+import userRoutes from './routes/user.routes';
 import { errorHandler } from './middleware/errorHandler';
 
-export const app = express();
+export const app: Express = express();
 
 // Security headers
 app.use(helmet());
@@ -26,10 +27,10 @@ app.use(morgan('combined'));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false }));
 
-// Rate limiting - auth endpoints are sensitive
+// Rate limiting - relaxed in development
 const authLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 20,             // 20 attempts per IP per minute
+  windowMs: 60 * 1000,
+  max: process.env.NODE_ENV === 'production' ? 20 : 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: 'Too many requests, please try again later' },
@@ -39,6 +40,7 @@ app.use('/auth', authLimiter);
 
 // Routes
 app.use('/auth', authRoutes);
+app.use('/users', userRoutes);
 
 // Health check
 app.get('/health', (_req, res) => {

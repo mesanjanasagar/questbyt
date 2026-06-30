@@ -27,14 +27,15 @@ export function authenticate(
 
   const token = authHeader.slice(7);
   try {
+    // JWT payload uses 'sub' for user id (not 'userId')
     const payload = jwt.verify(token, config.JWT_SECRET) as {
+      sub: string;
       storeId: string;
-      userId: string;
       role: string;
     };
 
     req.storeId = payload.storeId;
-    req.userId = payload.userId;
+    req.userId = payload.sub;
     req.role = payload.role;
     next();
   } catch {
@@ -52,6 +53,18 @@ export function requireAdmin(
     res.status(403).json({ error: 'Insufficient permissions' });
     return;
   }
+  next();
+}
 
+/** Restrict route to admin, owner, or manager */
+export function requireManagerOrAdmin(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction,
+): void {
+  if (req.role !== 'admin' && req.role !== 'owner' && req.role !== 'manager') {
+    res.status(403).json({ error: 'Insufficient permissions' });
+    return;
+  }
   next();
 }

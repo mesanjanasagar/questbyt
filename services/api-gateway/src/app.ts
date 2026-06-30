@@ -44,7 +44,7 @@ app.use(globalRateLimiter);
 // Per-user rate limiting (100 req/min per user)
 const perUserRateLimiter = rateLimit({
   windowMs: config.RATE_LIMIT_WINDOW_MS,
-  max: 100,
+  max: config.NODE_ENV === 'production' ? 100 : 10000,
   standardHeaders: false,
   legacyHeaders: false,
   keyGenerator: (req) => req.user?.sub || req.ip || 'anonymous',
@@ -61,11 +61,11 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// Auth routes (public)
+// Auth routes (public) — req.path here is already stripped of '/api/v1/auth' by Express
 app.use('/api/v1/auth', optionalAuthenticate, (req: any, res, next) => {
   injectCorrelationId(req);
   proxy(config.AUTH_SERVICE_URL, {
-    proxyReqPathResolver: (req: any) => req.path.replace(/^\/api\/v1/, ''),
+    proxyReqPathResolver: (req: any) => '/auth' + req.path,
   })(req, res, next);
 });
 
@@ -80,7 +80,8 @@ app.use('/api/v1', authenticate, (req: any, res, next) => {
   }
 
   const serviceProxy = proxy(target, {
-      proxyReqPathResolver: (req: any) => req.path,
+      // req.url preserves the query string (req.path drops it)
+      proxyReqPathResolver: (req: any) => req.url,
       userResHeaderDecorator: (headers: any, userReq: any) => {
       headers['x-correlation-id'] = userReq.correlationId || '';
       return headers;

@@ -1,13 +1,13 @@
-import { Router } from 'express';
+import { Router, type IRouter } from 'express';
 import { config, getStoreIdForPhone } from '../config';
 import { parseQuery } from '../nlu/router';
 import { executeQuery } from '../engine/query.engine';
 import { generateRecommendations } from '../engine/recommendation.engine';
 import { formatResponse, formatRecommendations } from '../engine/formatter';
-import { getSession, upsertSession } from '../session/context';
+import { upsertSession } from '../session/context';
 import type { WhatsAppMessage } from '@pos/shared-types';
 
-const router = Router();
+const router: IRouter = Router();
 
 // ---------------------------------------------
 // GET /webhook - WhatsApp verification handshake

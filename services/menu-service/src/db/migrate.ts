@@ -101,6 +101,17 @@ CREATE TABLE IF NOT EXISTS item_variants (
 );
 
 CREATE INDEX IF NOT EXISTS idx_variants_item ON item_variants(menu_item_id);
+
+CREATE TABLE IF NOT EXISTS menu_item_ingredients (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  menu_item_id UUID NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
+  inventory_product_id UUID NOT NULL,
+  quantity DECIMAL(10,3) NOT NULL,
+  unit_type VARCHAR(20) NOT NULL DEFAULT 'piece',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (menu_item_id, inventory_product_id)
+);
+CREATE INDEX IF NOT EXISTS idx_ingredients_item ON menu_item_ingredients(menu_item_id);
 `;
 
 async function runMigrations(): Promise<void> {

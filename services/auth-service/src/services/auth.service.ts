@@ -9,12 +9,10 @@ import {
 } from './token.service';
 import {
   UnauthorizedError,
-  NotFoundError,
   generateId,
   generateSecureToken,
 } from '@pos/shared-utils';
 import type { LoginRequest, LoginResponse, RefreshTokenResponse, UserRole } from '@pos/shared-types';
-import { config } from '../config';
 
 export async function login(req: LoginRequest): Promise<LoginResponse> {
   // 1. Find user
@@ -72,7 +70,7 @@ export async function login(req: LoginRequest): Promise<LoginResponse> {
     permissions,
   );
 
-  // 6. Cache session in Redis
+  // 6. Cache session in Redis (non-fatal — JWT is still valid without cache)
   await setDeviceSession(deviceId, {
     deviceId,
     userId: user.id,
@@ -80,7 +78,9 @@ export async function login(req: LoginRequest): Promise<LoginResponse> {
     role: user.role,
     permissions,
     expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-  });
+  }).catch((err: Error) =>
+    console.warn('[auth-service] Could not cache device session in Redis:', err.message),
+  );
 
   return {
     accessToken,

@@ -6,7 +6,12 @@ import { config } from './config';
 
 async function bootstrap(): Promise<void> {
   await connectDb();
-  await connectRedis();
+
+  // Redis is used for caching — connect in background so a slow Redis
+  // doesn't block the service from starting
+  connectRedis().catch((err: Error) =>
+    console.warn('[menu-service] Redis unavailable at startup, will retry:', err.message),
+  );
 
   app.listen(config.PORT, () => {
     console.info(`Menu service running on port ${config.PORT} [${config.NODE_ENV}]`);

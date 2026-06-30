@@ -107,7 +107,142 @@ export interface UpdateBrandingRequest {
   kdsHeaderColor?: string;
 }
 
-// Resolved theme — returned to frontend apps at boot
+
+// ─── Branch (physical location / outlet) ─────────────────────────────────────
+
+export interface Branch {
+  id: string;
+  storeId: string;
+  branchCode: string;
+  name: string;
+  address?: StoreAddress;
+  phone?: string;
+  email?: string;
+  timezone: string;
+  isMain: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateBranchRequest {
+  storeId: string;
+  branchCode: string;
+  name: string;
+  address?: StoreAddress;
+  phone?: string;
+  email?: string;
+  timezone?: string;
+  isMain?: boolean;
+}
+
+// ─── Dining Area (floor / section within a branch) ───────────────────────────
+
+export interface DiningArea {
+  id: string;
+  branchId: string;
+  storeId: string;
+  name: string;
+  description?: string;
+  floorNumber: number;
+  createdAt: string;
+}
+
+export interface CreateDiningAreaRequest {
+  branchId: string;
+  storeId: string;
+  name: string;
+  description?: string;
+  floorNumber?: number;
+}
+
+// ─── Table ───────────────────────────────────────────────────────────────────
+
+export interface Table {
+  id: string;
+  diningAreaId: string;
+  branchId: string;
+  storeId: string;
+  tableNumber: string;
+  capacity: number;
+  status: 'available' | 'occupied' | 'reserved' | 'cleaning';
+  qrCodeUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateTableRequest {
+  diningAreaId: string;
+  branchId: string;
+  storeId: string;
+  tableNumber: string;
+  capacity: number;
+}
+
+// ─── Staff Profile (store-service data, links to auth-service user) ──────────
+
+export interface StaffProfile {
+  id: string;
+  userId: string;
+  storeId: string;
+  branchId?: string;
+  employeeNumber: string;
+  position?: string;
+  pin?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Payment Configuration ───────────────────────────────────────────────────
+
+export interface PaymentConfiguration {
+  id: string;
+  storeId: string;
+  cashEnabled: boolean;
+  cardEnabled: boolean;
+  enabledMethods: string[];
+  currency: string;
+  updatedAt: string;
+}
+
+// ─── Notification Configuration ──────────────────────────────────────────────
+
+export interface NotificationConfiguration {
+  id: string;
+  storeId: string;
+  managerPhone?: string;
+  managerEmail?: string;
+  lowStockAlerts: boolean;
+  orderAlerts: boolean;
+  channels: string[];
+  updatedAt: string;
+}
+
+// ─── Onboarding State ────────────────────────────────────────────────────────
+
+export type OnboardingStep =
+  | 'restaurant_setup'
+  | 'branch_created'
+  | 'tables_configured'
+  | 'staff_added'
+  | 'device_registered'
+  | 'menu_created'
+  | 'inventory_configured'
+  | 'payment_configured'
+  | 'notifications_configured'
+  | 'completed';
+
+export interface OnboardingState {
+  storeId: string;
+  currentStep: OnboardingStep;
+  completedSteps: OnboardingStep[];
+  isComplete: boolean;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Resolved theme — returned to frontend apps at boot ─────────────────────
 // Contains everything needed to render the branded experience
 export interface ResolvedTheme {
   storeId: string;

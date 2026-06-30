@@ -7,6 +7,8 @@ const configSchema = z.object({
   JWT_SECRET: z.string().min(32),
   CORS_ORIGIN: z.string().default('*'),
   INTERNAL_SERVICE_SECRET: z.string().default('internal-secret-change-in-prod'),
+  AUTH_SERVICE_URL: z.string().default('http://localhost:3004'),
+  KAFKA_BROKER_URL: z.string().default('localhost:9092'),
 });
 
 const parsed = configSchema.safeParse(process.env);

@@ -1,6 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../services/token.service';
-import { getDeviceSession } from '../redis/client';
 import type { JwtPayload } from '@pos/shared-types';
 
 declare global {

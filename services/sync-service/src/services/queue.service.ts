@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { executeQuery, executeQuerySingle, executeTransaction } from '../db/client';
+import { executeQuery, executeQuerySingle } from '../db/client';
 
 export interface SyncQueueItem {
   id: string;
@@ -56,7 +56,7 @@ export async function getPendingItems(
 
 export async function markSynced(
   queueItemId: string,
-  syncedState: Record<string, unknown> | null = null
+  _syncedState: Record<string, unknown> | null = null
 ): Promise<void> {
   await executeQuery(
     `UPDATE sync_queue

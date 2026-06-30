@@ -71,6 +71,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_alerts_active
   ON low_stock_alerts(product_id, status) WHERE status IN ('pending','acknowledged');
 CREATE INDEX IF NOT EXISTS idx_alerts_store ON low_stock_alerts(store_id, status);
 CREATE INDEX IF NOT EXISTS idx_alerts_product ON low_stock_alerts(product_id);
+
+CREATE TABLE IF NOT EXISTS order_reservations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id VARCHAR(255) NOT NULL,
+  store_id UUID NOT NULL,
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  quantity DECIMAL(12,2) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'reserved'
+    CHECK (status IN ('reserved','consumed','released')),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_reservations_order ON order_reservations(order_id);
+CREATE INDEX IF NOT EXISTS idx_reservations_store ON order_reservations(store_id);
 `;
 
 async function runMigrations(): Promise<void> {

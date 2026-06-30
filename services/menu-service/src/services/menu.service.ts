@@ -1,7 +1,7 @@
 import { db } from '../db/client';
 import { redisClient } from '../redis/client';
 import { config } from '../config';
-import { generateId, NotFoundError, buildPaginatedResponse } from '@pos/shared-utils';
+import { generateId, NotFoundError } from '@pos/shared-utils';
 import type { Menu, MenuCategory, MenuItem, CreateMenuRequest, CreateCategoryRequest, CreateMenuItemRequest } from '@pos/shared-types';
 
 const MENU_CACHE_KEY = (storeId: string) => `menu:${storeId}`;
@@ -217,6 +217,54 @@ export async function createItem(data: CreateMenuItemRequest): Promise<MenuItem>
   return rowToItem(result.rows[0]);
 }
 
+export async function updateItem(
+  id: string,
+  data: {
+    name?: string;
+    nameAr?: string | null;
+    description?: string | null;
+    basePrice?: number;
+    taxRate?: number;
+    sku?: string | null;
+    calories?: number | null;
+    allergens?: string | null;
+    tags?: string | null;
+    sortOrder?: number;
+    isFeatured?: boolean;
+    inventoryProductId?: string | null;
+  },
+): Promise<MenuItem> {
+  const existing = await db.query(`SELECT * FROM menu_items WHERE id = $1`, [id]);
+  if (!existing.rowCount || existing.rowCount === 0) throw new NotFoundError(`Menu item ${id} not found`);
+  const row = existing.rows[0];
+
+  const result = await db.query(
+    `UPDATE menu_items SET
+      name = $1, name_ar = $2, description = $3, base_price = $4, tax_rate = $5,
+      sku = $6, calories = $7, allergens = $8, tags = $9,
+      sort_order = $10, is_featured = $11, inventory_product_id = $12, updated_at = NOW()
+     WHERE id = $13 RETURNING *`,
+    [
+      data.name ?? row.name,
+      'nameAr' in data ? data.nameAr : row.name_ar,
+      'description' in data ? data.description : row.description,
+      data.basePrice ?? parseFloat(row.base_price),
+      data.taxRate ?? parseFloat(row.tax_rate),
+      'sku' in data ? data.sku : row.sku,
+      'calories' in data ? data.calories : row.calories,
+      'allergens' in data ? data.allergens : row.allergens,
+      'tags' in data ? data.tags : row.tags,
+      data.sortOrder ?? row.sort_order,
+      data.isFeatured ?? row.is_featured,
+      'inventoryProductId' in data ? data.inventoryProductId : row.inventory_product_id,
+      id,
+    ],
+  );
+
+  await invalidateMenuCache(result.rows[0].store_id);
+  return rowToItem(result.rows[0]);
+}
+
 export async function updateItemStatus(id: string, status: string): Promise<MenuItem> {
   const result = await db.query(
     `UPDATE menu_items SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
@@ -311,5 +359,93 @@ function rowToItem(row: Record<string, unknown>): MenuItem {
     inventoryProductId: row.inventory_product_id as string | undefined,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
+  };
+}
+
+// ——————————————————————————————————————————
+// Ingredients (links to inventory products)
+// ——————————————————————————————————————————
+
+export interface MenuItemIngredient {
+  id: string;
+  menuItemId: string;
+  inventoryProductId: string;
+  quantity: number;
+  unitType: string;
+  createdAt: string;
+}
+
+export async function getIngredients(menuItemId: string): Promise<MenuItemIngredient[]> {
+  const result = await db.query(
+    `SELECT * FROM menu_item_ingredients WHERE menu_item_id = $1 ORDER BY created_at ASC`,
+    [menuItemId],
+  );
+  return result.rows.map(rowToIngredient);
+}
+
+export async function addIngredient(
+  menuItemId: string,
+  inventoryProductId: string,
+  quantity: number,
+  unitType: string,
+): Promise<MenuItemIngredient> {
+  const id = generateId();
+  const result = await db.query(
+    `INSERT INTO menu_item_ingredients (id, menu_item_id, inventory_product_id, quantity, unit_type)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (menu_item_id, inventory_product_id)
+     DO UPDATE SET quantity = EXCLUDED.quantity, unit_type = EXCLUDED.unit_type
+     RETURNING *`,
+    [id, menuItemId, inventoryProductId, quantity, unitType],
+  );
+  return rowToIngredient(result.rows[0]);
+}
+
+export async function updateIngredient(
+  ingredientId: string,
+  quantity: number,
+  unitType: string,
+): Promise<MenuItemIngredient> {
+  const result = await db.query(
+    `UPDATE menu_item_ingredients SET quantity = $2, unit_type = $3 WHERE id = $1 RETURNING *`,
+    [ingredientId, quantity, unitType],
+  );
+  if (!result.rowCount || result.rowCount === 0) throw new NotFoundError(`Ingredient ${ingredientId} not found`);
+  return rowToIngredient(result.rows[0]);
+}
+
+export async function removeIngredient(ingredientId: string): Promise<void> {
+  const result = await db.query(`DELETE FROM menu_item_ingredients WHERE id = $1`, [ingredientId]);
+  if (!result.rowCount || result.rowCount === 0) throw new NotFoundError(`Ingredient ${ingredientId} not found`);
+}
+
+export async function resolveIngredientsForOrder(
+  items: Array<{ menuItemId: string; quantity: number }>,
+): Promise<Array<{ productId: string; quantity: number }>> {
+  if (items.length === 0) return [];
+  const menuItemIds = items.map((i) => i.menuItemId);
+  const placeholders = menuItemIds.map((_, i) => `$${i + 1}`).join(',');
+  const result = await db.query(
+    `SELECT * FROM menu_item_ingredients WHERE menu_item_id IN (${placeholders})`,
+    menuItemIds,
+  );
+  const quantityMap = new Map<string, number>();
+  for (const row of result.rows) {
+    const orderItem = items.find((i) => i.menuItemId === row.menu_item_id);
+    if (!orderItem) continue;
+    const total = parseFloat(row.quantity) * orderItem.quantity;
+    quantityMap.set(row.inventory_product_id, (quantityMap.get(row.inventory_product_id) ?? 0) + total);
+  }
+  return Array.from(quantityMap.entries()).map(([productId, quantity]) => ({ productId, quantity }));
+}
+
+function rowToIngredient(row: Record<string, unknown>): MenuItemIngredient {
+  return {
+    id: row.id as string,
+    menuItemId: row.menu_item_id as string,
+    inventoryProductId: row.inventory_product_id as string,
+    quantity: parseFloat(row.quantity as string),
+    unitType: row.unit_type as string,
+    createdAt: row.created_at as string,
   };
 }

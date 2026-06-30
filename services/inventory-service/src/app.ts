@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Express } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import morgan from 'morgan';
@@ -6,7 +6,7 @@ import rateLimit from 'express-rate-limit';
 import inventoryRoutes from './routes/inventory.routes';
 import { errorHandler } from './middleware/errorHandler';
 
-export const app = express();
+export const app: Express = express();
 
 app.use(helmet());
 app.use(
@@ -32,7 +32,7 @@ app.use(
   }),
 );
 
-app.use('/api/v1/inventory', inventoryRoutes);
+app.use('/inventory', inventoryRoutes);
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'inventory-service', timestamp: new Date().toISOString() });
 });

@@ -1,11 +1,11 @@
-import { Router } from 'express';
+import { Router, IRouter } from 'express';
 import { z } from 'zod';
 import { login, refreshTokens, logout, heartbeat } from '../services/auth.service';
 import { authenticate } from '../middleware/authenticate';
 import { validateOrThrow, successResponse } from '@pos/shared-utils';
 import { DeviceType } from '@pos/shared-types';
 
-const router = Router();
+const router: IRouter = Router();
 
 // POST /auth/login
 router.post('/login', async (req, res, next) => {

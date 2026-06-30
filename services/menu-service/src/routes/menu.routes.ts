@@ -1,10 +1,10 @@
-import { Router } from 'express';
+import { Router, IRouter } from 'express';
 import { z } from 'zod';
 import * as menuService from '../services/menu.service';
 import { authenticate } from '../middleware/authenticate';
 import { validateOrThrow, successResponse } from '@pos/shared-utils';
 
-const router = Router();
+const router: IRouter = Router();
 
 // All routes require auth
 router.use(authenticate);

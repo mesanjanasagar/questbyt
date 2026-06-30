@@ -1,10 +1,8 @@
-import { Router, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
-import { validateOrThrow } from '@pos/shared-utils';
+import { Router, type IRouter, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/authenticate';
 import * as forecastService from '../services/forecast.service';
 
-const router = Router();
+const router: IRouter = Router();
 
 // Get forecasts
 router.get('/forecasts', authenticate, async (req: Request, res: Response, next: NextFunction) => {

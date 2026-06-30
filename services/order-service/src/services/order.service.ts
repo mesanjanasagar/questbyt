@@ -1,6 +1,9 @@
 import { PoolClient } from 'pg';
+import http from 'http';
+import https from 'https';
 import { db } from '../db/client';
 import { publishEvent } from '../events/producer';
+import { config } from '../config';
 import {
   generateId,
   NotFoundError,
@@ -18,6 +21,70 @@ import type {
   OrderListQuery,
 } from '@pos/shared-types';
 import { OrderStatus, Platform } from '@pos/shared-types';
+
+// ───────────────────────────────────────────
+// Ingredient reservation helpers (fire-and-forget)
+// ───────────────────────────────────────────
+
+function internalPost(targetUrl: string, body: unknown): Promise<unknown> {
+  return new Promise((resolve) => {
+    const bodyStr = JSON.stringify(body);
+    const parsed = new URL(targetUrl);
+    const mod = parsed.protocol === 'https:' ? https : http;
+    const req = mod.request(parsed, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(bodyStr),
+        'x-internal-service': config.INTERNAL_SERVICE_SECRET,
+      },
+    });
+    let data = '';
+    req.on('response', (res) => {
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve(null); } });
+    });
+    req.on('error', (err) => {
+      console.warn('[order-service] internal HTTP error:', err.message);
+      resolve(null);
+    });
+    req.write(bodyStr);
+    req.end();
+  });
+}
+
+async function reserveIngredientsAsync(
+  orderId: string,
+  storeId: string,
+  items: Array<{ menuItemId: string; quantity: number }>,
+): Promise<void> {
+  try {
+    const resolved = await internalPost(`${config.MENU_SERVICE_URL}/items/resolve-ingredients`, { items }) as any;
+    const ingredientItems: Array<{ productId: string; quantity: number }> = resolved?.data ?? [];
+    if (!ingredientItems.length) return;
+    await internalPost(`${config.INVENTORY_SERVICE_URL}/inventory/reserve-for-order`, { orderId, storeId, items: ingredientItems });
+  } catch (err) {
+    console.warn('[order-service] Could not reserve ingredients:', (err as Error).message);
+  }
+}
+
+function reserveIngredients(orderId: string, storeId: string, items: Array<{ menuItemId: string; quantity: number }>): void {
+  reserveIngredientsAsync(orderId, storeId, items).catch((err) =>
+    console.warn('[order-service] reserveIngredients error:', (err as Error).message),
+  );
+}
+
+function releaseIngredients(orderId: string): void {
+  internalPost(`${config.INVENTORY_SERVICE_URL}/inventory/release-for-order`, { orderId }).catch((err) =>
+    console.warn('[order-service] releaseIngredients error:', (err as Error).message),
+  );
+}
+
+function consumeIngredients(orderId: string): void {
+  internalPost(`${config.INVENTORY_SERVICE_URL}/inventory/consume-for-order`, { orderId, userId: 'system' }).catch((err) =>
+    console.warn('[order-service] consumeIngredients error:', (err as Error).message),
+  );
+}
 
 // ───────────────────────────────────────────
 // Create order
@@ -87,6 +154,9 @@ export async function createOrder(req: CreateOrderRequest): Promise<Order> {
       'Order',
       { orderId, storeId: req.storeId, cashierId: req.cashierId, deviceId: req.deviceId, orderType: req.orderType, items: req.items, totalAmount },
     ).catch(console.error);
+
+    // Reserve ingredients fire-and-forget
+    reserveIngredients(orderId, req.storeId, req.items.map((i) => ({ menuItemId: i.menuItemId, quantity: i.quantity })));
 
     return order;
   } catch (err) {
@@ -306,6 +376,8 @@ export async function markOrderPaid(
     paymentStatus: req.paymentStatus,
   }).catch(console.error);
 
+  if (req.paymentStatus === 'paid') consumeIngredients(orderId);
+
   return rowToOrder(order);
 }
 
@@ -336,6 +408,8 @@ export async function cancelOrder(
   publishEvent('order.cancelled', prev.store_id, orderId, 'Order', {
     orderId, reason: req.reason,
   }).catch(console.error);
+
+  releaseIngredients(orderId);
 
   return rowToOrder(result.rows[0]);
 }

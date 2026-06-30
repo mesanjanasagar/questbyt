@@ -1,5 +1,6 @@
 import { db } from '../db/client';
 import { generateId, NotFoundError } from '@pos/shared-utils';
+import { publishEvent } from '../events/producer';
 import type {
   StoreProfile,
   BrandingConfig,
@@ -42,11 +43,12 @@ const DEFAULT_RECEIPT = {
 // ——————————————————————————————————————————
 
 export async function createStore(req: CreateStoreRequest): Promise<StoreProfile> {
+  // Declare storeId before try block so it's accessible after COMMIT
+  const storeId = generateId();
   const client = await db.connect();
+
   try {
     await client.query('BEGIN');
-
-    const storeId = generateId();
 
     // 1. Create store
     await client.query(
@@ -97,13 +99,40 @@ export async function createStore(req: CreateStoreRequest): Promise<StoreProfile
     );
 
     await client.query('COMMIT');
-    return getStoreById(storeId);
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
   } finally {
     client.release();
   }
+
+  // Seed onboarding state — non-fatal: live DB may lack UNIQUE constraint if
+  // migration ran before this column was added. Restaurant creation must succeed
+  // regardless.
+  db.query(
+    `INSERT INTO onboarding_state (store_id, current_step, completed_steps)
+     VALUES ($1, 'restaurant_setup', '[]')
+     ON CONFLICT (store_id) DO NOTHING`,
+    [storeId],
+  ).catch((err: Error) =>
+    console.warn('[store-service] onboarding_state seed failed (non-fatal):', err.message),
+  );
+
+  await publishEvent(
+    'store_created_v1',
+    storeId,
+    storeId,
+    'store',
+    {
+      storeId,
+      name: req.name,
+      businessType: req.businessType,
+      currency: req.currency ?? 'AED',
+      timezone: req.timezone ?? 'Asia/Dubai',
+    },
+  );
+
+  return getStoreById(storeId);
 }
 
 // ——————————————————————————————————————————
@@ -126,6 +155,54 @@ export async function getStoreById(storeId: string): Promise<StoreProfile> {
     brandingRes.rows[0],
     receiptRes.rows[0],
   );
+}
+
+// ——————————————————————————————————————————
+// List all stores (admin view)
+// ——————————————————————————————————————————
+
+export async function listStores(): Promise<StoreProfile[]> {
+  const res = await db.query(
+    `SELECT s.*, sb.primary_color, sb.logo_url, sb.display_name
+     FROM stores s
+     LEFT JOIN store_branding sb ON sb.store_id = s.id
+     ORDER BY s.created_at DESC`,
+  );
+  return res.rows.map((row: Record<string, unknown>) =>
+    assembleStoreProfile(row, row, undefined),
+  );
+}
+
+// ——————————————————————————————————————————
+// Set active / inactive status
+// ——————————————————————————————————————————
+
+export async function setStoreStatus(
+  storeId: string,
+  isActive: boolean,
+): Promise<StoreProfile> {
+  const res = await db.query(
+    `UPDATE stores SET is_active = $2, updated_at = NOW() WHERE id = $1 RETURNING id`,
+    [storeId, isActive],
+  );
+  if (!res.rowCount || res.rowCount === 0) {
+    throw new NotFoundError(`Store ${storeId} not found`);
+  }
+  return getStoreById(storeId);
+}
+
+// ——————————————————————————————————————————
+// Hard-delete a store (admin only, cascades to all child records)
+// ——————————————————————————————————————————
+
+export async function deleteStore(storeId: string): Promise<void> {
+  const res = await db.query(
+    `DELETE FROM stores WHERE id = $1 RETURNING id`,
+    [storeId],
+  );
+  if (!res.rowCount || res.rowCount === 0) {
+    throw new NotFoundError(`Store ${storeId} not found`);
+  }
 }
 
 // ——————————————————————————————————————————
@@ -303,7 +380,7 @@ export async function resolveTheme(storeId: string): Promise<ResolvedTheme> {
 function assembleStoreProfile(
   store: Record<string, unknown>,
   branding: Record<string, unknown>,
-  receipt: Record<string, unknown>,
+  receipt: Record<string, unknown> | undefined,
 ): StoreProfile {
   const b = branding ?? {};
   const r = receipt ?? {};

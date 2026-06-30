@@ -1,13 +1,17 @@
-import express from 'express';
+import express, { Express } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { storeRoutes } from './routes/store.routes';
+import { branchRoutes } from './routes/branch.routes';
+import { tableRoutes } from './routes/table.routes';
+import { onboardingRoutes } from './routes/onboarding.routes';
+import { staffRoutes } from './routes/staff.routes';
 import { errorHandler } from './middleware/errorHandler';
 import { config } from './config';
 
-const app = express();
+const app: Express = express();
 
 // ── Security ─────────────────────────
 app.use(helmet());
@@ -34,6 +38,10 @@ app.get('/health', (_req, res) => {
 
 // ── Routes ───────────────────────────
 app.use('/stores', storeRoutes);
+app.use('/branches', branchRoutes);
+app.use('/tables', tableRoutes);
+app.use('/onboarding', onboardingRoutes);
+app.use('/staff', staffRoutes);
 
 // ── Error handler ────────────────────
 app.use(errorHandler);

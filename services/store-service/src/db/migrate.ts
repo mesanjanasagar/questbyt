@@ -32,6 +32,127 @@ CREATE TABLE IF NOT EXISTS stores (
 CREATE INDEX IF NOT EXISTS idx_stores_active ON stores(is_active);
 
 -- ——————————————————————————————————————————
+-- Branches (physical outlets under a store)
+-- ——————————————————————————————————————————
+CREATE TABLE IF NOT EXISTS branches (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+    branch_code VARCHAR(50) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    address JSONB,
+    phone VARCHAR(50),
+    email VARCHAR(255),
+    timezone VARCHAR(100) NOT NULL DEFAULT 'Asia/Dubai',
+    is_main BOOLEAN NOT NULL DEFAULT FALSE,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (store_id, branch_code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_branches_store ON branches(store_id);
+
+-- ——————————————————————————————————————————
+-- Dining Areas / Floors within a branch
+-- ——————————————————————————————————————————
+CREATE TABLE IF NOT EXISTS dining_areas (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+    store_id UUID NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    floor_number INT NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_dining_areas_branch ON dining_areas(branch_id);
+CREATE INDEX IF NOT EXISTS idx_dining_areas_store ON dining_areas(store_id);
+
+-- ——————————————————————————————————————————
+-- Tables within a dining area
+-- ——————————————————————————————————————————
+CREATE TABLE IF NOT EXISTS tables (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    dining_area_id UUID NOT NULL REFERENCES dining_areas(id) ON DELETE CASCADE,
+    branch_id UUID NOT NULL REFERENCES branches(id) ON DELETE CASCADE,
+    store_id UUID NOT NULL,
+    table_number VARCHAR(20) NOT NULL,
+    capacity INT NOT NULL DEFAULT 4,
+    status VARCHAR(30) NOT NULL DEFAULT 'available'
+        CHECK (status IN ('available','occupied','reserved','cleaning')),
+    qr_code_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (branch_id, table_number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_tables_branch ON tables(branch_id);
+CREATE INDEX IF NOT EXISTS idx_tables_store ON tables(store_id);
+CREATE INDEX IF NOT EXISTS idx_tables_dining_area ON tables(dining_area_id);
+
+-- ——————————————————————————————————————————
+-- Staff Profiles (links auth-service user_id → store context)
+-- The auth-service owns credentials; store-service owns the profile
+-- ——————————————————————————————————————————
+CREATE TABLE IF NOT EXISTS staff_profiles (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    store_id UUID NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+    branch_id UUID REFERENCES branches(id),
+    employee_number VARCHAR(50) NOT NULL,
+    position VARCHAR(100),
+    pin VARCHAR(10),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (store_id, employee_number),
+    UNIQUE (store_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_staff_profiles_store ON staff_profiles(store_id);
+CREATE INDEX IF NOT EXISTS idx_staff_profiles_user ON staff_profiles(user_id);
+
+-- ——————————————————————————————————————————
+-- Payment configuration per store
+-- ——————————————————————————————————————————
+CREATE TABLE IF NOT EXISTS payment_configurations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL UNIQUE REFERENCES stores(id) ON DELETE CASCADE,
+    cash_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    card_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    enabled_methods JSONB NOT NULL DEFAULT '["cash","card"]',
+    currency VARCHAR(10) NOT NULL DEFAULT 'AED',
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ——————————————————————————————————————————
+-- Notification configuration per store
+-- ——————————————————————————————————————————
+CREATE TABLE IF NOT EXISTS notification_configurations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL UNIQUE REFERENCES stores(id) ON DELETE CASCADE,
+    manager_phone VARCHAR(50),
+    manager_email VARCHAR(255),
+    low_stock_alerts BOOLEAN NOT NULL DEFAULT TRUE,
+    order_alerts BOOLEAN NOT NULL DEFAULT TRUE,
+    channels JSONB NOT NULL DEFAULT '["whatsapp"]',
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ——————————————————————————————————————————
+-- Onboarding state (tracks wizard progress)
+-- ——————————————————————————————————————————
+CREATE TABLE IF NOT EXISTS onboarding_state (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    store_id UUID NOT NULL UNIQUE REFERENCES stores(id) ON DELETE CASCADE,
+    current_step VARCHAR(50) NOT NULL DEFAULT 'restaurant_setup',
+    completed_steps JSONB NOT NULL DEFAULT '[]',
+    is_complete BOOLEAN NOT NULL DEFAULT FALSE,
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ——————————————————————————————————————————
 -- Branding / white-label config (1-to-1 with store)
 -- ——————————————————————————————————————————
 CREATE TABLE IF NOT EXISTS store_branding (
@@ -75,6 +196,11 @@ CREATE TABLE IF NOT EXISTS store_receipt_config (
         CHECK (digital_receipt_channel IN ('email','sms','whatsapp')),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Idempotent: ensure UNIQUE index on onboarding_state.store_id so that
+-- ON CONFLICT (store_id) works even if the table predates this constraint.
+CREATE UNIQUE INDEX IF NOT EXISTS onboarding_state_store_id_key
+    ON onboarding_state (store_id);
 `;
 
 async function runMigrations(): Promise<void> {

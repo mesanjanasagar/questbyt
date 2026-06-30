@@ -1,11 +1,11 @@
-import { Router } from 'express';
+import { Router, type IRouter } from 'express';
 import { z } from 'zod';
 import * as campaignService from '../services/campaign.service';
 import { authenticate } from '../middleware/authenticate';
 import { validateOrThrow, successResponse } from '@pos/shared-utils';
 import type { Customer } from '@pos/shared-types';
 
-const router = Router();
+const router: IRouter = Router();
 
 router.use(authenticate);
 

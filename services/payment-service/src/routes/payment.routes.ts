@@ -1,11 +1,11 @@
-import { Router } from 'express';
+import { Router, type IRouter } from 'express';
 import { z } from 'zod';
 import * as paymentService from '../services/payment.service';
 import { authenticate } from '../middleware/authenticate';
 import { validateOrThrow, successResponse } from '@pos/shared-utils';
 import { PaymentMethod } from '@pos/shared-types';
 
-const router = Router();
+const router: IRouter = Router();
 
 router.use(authenticate);
 

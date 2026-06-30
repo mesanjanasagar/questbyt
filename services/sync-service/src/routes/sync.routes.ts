@@ -1,11 +1,11 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, type IRouter, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { validateOrThrow } from '@pos/shared-utils';
 import { authenticate } from '../middleware/authenticate';
 import * as queueService from '../services/queue.service';
 import * as reconciliationService from '../services/reconciliation.service';
 
-const router = Router();
+const router: IRouter = Router();
 
 // Add item to sync queue (offline operations)
 router.post('/queue', authenticate, async (req: Request, res: Response, next: NextFunction) => {
@@ -73,7 +73,7 @@ router.post('/reconcile/:deviceId', authenticate, async (req: Request, res: Resp
     for (const item of pendingItems) {
       try {
         // Fetch remote state if exists
-        let remoteState = null;
+        let remoteState: Record<string, unknown> | null = null;
         if (item.resourceType === 'order') {
           try {
             const response = await fetch(
@@ -83,7 +83,7 @@ router.post('/reconcile/:deviceId', authenticate, async (req: Request, res: Resp
               }
             );
             if (response.ok) {
-              const data = await response.json();
+              const data = await response.json() as { data: Record<string, unknown> };
               remoteState = data.data;
             }
           } catch {
@@ -95,7 +95,7 @@ router.post('/reconcile/:deviceId', authenticate, async (req: Request, res: Resp
         const log = await reconciliationService.reconcileOrder(item, remoteState);
 
         // Mark as synced
-        await queueService.markSynced(item.id, log.resolvedState);
+        await queueService.markSynced(item.id, log.resolvedState as Record<string, unknown> | null);
 
         // Reconcile inventory if it's an order
         if (item.resourceType === 'order' && item.operationType === 'order_create') {
@@ -157,9 +157,8 @@ router.get('/failed', authenticate, async (req: Request, res: Response, next: Ne
 });
 
 // Retry failed reconciliation
-router.post('/retry/:itemId', authenticate, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/retry/:itemId', authenticate, async (_req: Request, res: Response, next: NextFunction) => {
   try {
-    const { itemId } = req.params;
     // Placeholder: would implement actual retry logic
     res.json({ success: true, message: 'Retry queued' });
   } catch (err) {

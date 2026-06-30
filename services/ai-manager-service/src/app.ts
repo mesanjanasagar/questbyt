@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { type Express } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import morgan from 'morgan';
@@ -7,7 +7,7 @@ import webhookRoutes from './routes/webhook.routes';
 import { errorHandler } from './middleware/errorHandler';
 import { getActiveSessions } from './session/context';
 
-export const app = express();
+export const app: Express = express();
 
 app.use(helmet());
 app.use(cors({ origin: process.env.ALLOWED_ORIGINS?.split(',') ?? ['http://localhost:3000'], credentials: true }));
