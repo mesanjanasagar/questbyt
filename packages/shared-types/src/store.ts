@@ -25,6 +25,10 @@ export interface StoreProfile {
   receiptConfig: ReceiptConfig;
   operatingHours: OperatingHours[];
   isActive: boolean;
+  // Whether POS terminals prompt for customer name/phone/email while taking
+  // an order. Off by default suits quick-service; sit-down/loyalty-driven
+  // restaurants usually want it on.
+  posCaptureCustomerDetails: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -165,7 +169,7 @@ export interface Table {
   storeId: string;
   tableNumber: string;
   capacity: number;
-  status: 'available' | 'occupied' | 'reserved' | 'cleaning';
+  status: 'available' | 'occupied' | 'reserved' | 'cleaning' | 'food_preparing' | 'ready_to_serve' | 'bill_requested' | 'paid';
   qrCodeUrl?: string;
   createdAt: string;
   updatedAt: string;

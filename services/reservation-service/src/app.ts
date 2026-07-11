@@ -24,7 +24,9 @@ app.use(rateLimit({
   legacyHeaders: false,
 }));
 
-app.use('/api/v1/reservations', reservationRoutes);
+// See customer-service's app.ts for why this can't be '/api/v1/reservations'
+// — the gateway strips that prefix before proxying here.
+app.use('/reservations', reservationRoutes);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'reservation-service', timestamp: new Date().toISOString() });

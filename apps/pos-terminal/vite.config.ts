@@ -46,11 +46,18 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/auth': 'http://localhost:3004',
-      '/api/v1/menus': 'http://localhost:3005',
-      '/api/v1/items': 'http://localhost:3005',
-      '/api/v1/orders': 'http://localhost:3001',
-      '/api/v1/payments': 'http://localhost:3003',
+      // Auth service via the gateway (/auth → /api/v1/auth)
+      '/auth': {
+        target: 'http://localhost:3000',
+        rewrite: (path) => '/api/v1' + path,
+        changeOrigin: true,
+      },
+      // All /api/v1 routes go through the gateway which handles
+      // path-stripping + JWT auth before forwarding to services
+      '/api/v1': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
     },
   },
 });

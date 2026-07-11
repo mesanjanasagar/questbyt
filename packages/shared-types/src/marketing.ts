@@ -10,7 +10,28 @@ export type CampaignTrigger =
 
 export type CampaignChannel = 'whatsapp' | 'email' | 'sms' | 'push';
 
-export type CampaignStatus = 'active' | 'paused' | 'archived';
+export type CampaignStatus =
+  | 'draft'
+  | 'scheduled'
+  | 'active'
+  | 'paused'
+  | 'completed'
+  | 'expired'
+  | 'archived';
+
+export type CampaignType =
+  | 'percentage_discount'
+  | 'fixed_discount'
+  | 'bogo'
+  | 'free_item'
+  | 'loyalty_reward'
+  | 'birthday'
+  | 'first_order'
+  | 'win_back'
+  | 'churn_recovery'
+  | 'seasonal'
+  | 'festival'
+  | 'coupon';
 
 export type ExecutionStatus = 'queued' | 'sent' | 'failed' | 'skipped';
 
@@ -19,18 +40,37 @@ export interface Campaign {
   storeId: string;
   name: string;
   description?: string;
+  // Promo/discount fields
+  campaignType?: CampaignType;
+  couponCode?: string;
+  discountType?: 'percentage' | 'fixed';
+  discountValue?: number;
+  maxDiscount?: number;
+  minOrderAmount?: number;
+  validFrom?: string;
+  validUntil?: string;
+  maxRedemptions?: number;
+  usageCount: number;
+  usagePerCustomer: number;
+  priority: number;
+  applicableBranches: string[];
+  applicableSegments: string[];
+  applicableCategories: string[];
+  applicableItems: string[];
+  revenueGenerated: number;
+  ordersCount: number;
+  customersReached: number;
+  roi: number;
+  // Legacy messaging automation fields
   trigger: CampaignTrigger;
-  // Trigger condition: only fire if segment matches this value (optional)
   targetSegment?: string;
-  // Trigger condition: only fire if previous segment matches (for segment_changed)
   fromSegment?: string;
-  channel: CampaignChannel;
-  messageTemplate: string; // Supports {{customer_name}}, {{store_name}}, {{points}} tokens
-  status: CampaignStatus;
-  // Throttle: don't send to same customer more often than N days (0 = no throttle)
+  channel?: CampaignChannel;
+  messageTemplate?: string;
   throttleDays: number;
   totalSent: number;
   totalFailed: number;
+  status: CampaignStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -39,17 +79,49 @@ export interface CreateCampaignRequest {
   storeId: string;
   name: string;
   description?: string;
-  trigger: CampaignTrigger;
+  campaignType?: CampaignType;
+  couponCode?: string;
+  discountType?: 'percentage' | 'fixed';
+  discountValue?: number;
+  maxDiscount?: number;
+  minOrderAmount?: number;
+  validFrom?: string;
+  validUntil?: string;
+  maxRedemptions?: number;
+  usagePerCustomer?: number;
+  priority?: number;
+  applicableBranches?: string[];
+  applicableSegments?: string[];
+  applicableCategories?: string[];
+  applicableItems?: string[];
+  // Legacy
+  trigger?: CampaignTrigger;
   targetSegment?: string;
   fromSegment?: string;
-  channel: CampaignChannel;
-  messageTemplate: string;
+  channel?: CampaignChannel;
+  messageTemplate?: string;
   throttleDays?: number;
+  status?: CampaignStatus;
 }
 
 export interface UpdateCampaignRequest {
   name?: string;
   description?: string;
+  campaignType?: CampaignType;
+  couponCode?: string;
+  discountType?: 'percentage' | 'fixed';
+  discountValue?: number;
+  maxDiscount?: number;
+  minOrderAmount?: number;
+  validFrom?: string;
+  validUntil?: string;
+  maxRedemptions?: number;
+  usagePerCustomer?: number;
+  priority?: number;
+  applicableBranches?: string[];
+  applicableSegments?: string[];
+  applicableCategories?: string[];
+  applicableItems?: string[];
   messageTemplate?: string;
   status?: CampaignStatus;
   throttleDays?: number;
@@ -64,7 +136,7 @@ export interface CampaignExecution {
   renderedMessage: string;
   status: ExecutionStatus;
   errorMessage?: string;
-  triggeredBy: string; // event type or 'manual'
+  triggeredBy: string;
   sentAt?: string;
   createdAt: string;
 }

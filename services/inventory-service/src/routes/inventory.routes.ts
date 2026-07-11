@@ -9,6 +9,13 @@ const router: IRouter = Router();
 
 const INTERNAL_SECRET = process.env.INTERNAL_SERVICE_SECRET ?? 'internal-secret-change-in-prod';
 
+// stock_movements.created_by is a UUID column — a literal 'system' string
+// used to be passed here for unattributed/service-triggered movements and
+// would throw on insert (invalid UUID), silently rolling back the whole
+// movement (including the consume-for-order path that fires on every
+// payment). This nil UUID is a real, valid value reserved for that case.
+const SYSTEM_USER_ID = '00000000-0000-0000-0000-000000000000';
+
 function requireInternal(req: any, res: any, next: any) {
   if (req.headers['x-internal-service'] !== INTERNAL_SECRET) {
     res.status(403).json({ success: false, error: 'Forbidden' });
@@ -24,7 +31,14 @@ router.post('/reserve-for-order', requireInternal, async (req, res, next) => {
       z.object({
         orderId: z.string().min(1),
         storeId: z.string().uuid(),
-        items: z.array(z.object({ productId: z.string().uuid(), quantity: z.number().positive() })),
+        items: z.array(z.object({
+          productId: z.string().uuid(),
+          quantity: z.number().positive(),
+          // Recipe unit (g/ml/pc/...) — converted to the product's own
+          // stocking unit inside reserveStockForOrder. Optional/omittable
+          // for any caller that already reserves in stock units directly.
+          unitType: z.string().optional(),
+        })),
       }),
       req.body,
     );
@@ -53,7 +67,7 @@ router.post('/consume-for-order', requireInternal, async (req, res, next) => {
       z.object({ orderId: z.string().min(1), userId: z.string().optional() }),
       req.body,
     );
-    await inventoryService.consumeReservedForOrder(body.orderId, body.userId ?? 'system');
+    await inventoryService.consumeReservedForOrder(body.orderId, body.userId ?? SYSTEM_USER_ID);
     res.json(successResponse(null, 'Stock consumed'));
   } catch (err) {
     next(err);
@@ -96,8 +110,35 @@ router.post('/products', async (req, res, next) => {
       }),
       req.body,
     );
-    const product = await inventoryService.createProduct({ ...body, sku: body.sku ?? '' });
+    const product = await inventoryService.createProduct(body);
     res.status(201).json(successResponse(product, 'Product created'));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/v1/inventory/products/bulk-import
+router.post('/products/bulk-import', async (req, res, next) => {
+  try {
+    const body = validateOrThrow(
+      z.object({
+        storeId: z.string().uuid(),
+        rows: z.array(
+          z.object({
+            name: z.string().min(1),
+            sku: z.string().optional(),
+            description: z.string().optional(),
+            unitType: z.string().optional(),
+            currentStock: z.number().optional(),
+            reorderLevel: z.number().optional(),
+            reorderQuantity: z.number().optional(),
+          }),
+        ).min(1).max(2000),
+      }),
+      req.body,
+    );
+    const result = await inventoryService.bulkImportProducts(body.storeId, body.rows, req.user?.sub ?? SYSTEM_USER_ID);
+    res.json(successResponse(result));
   } catch (err) {
     next(err);
   }
@@ -196,7 +237,7 @@ router.patch('/products/:productId/stock', async (req, res, next) => {
       }),
       req.body,
     );
-    const result = await inventoryService.setInitialStock(productId, body, req.user?.sub ?? 'system');
+    const result = await inventoryService.setInitialStock(productId, body, req.user?.sub ?? SYSTEM_USER_ID);
     res.json(successResponse(result.inventory, 'Stock initialized'));
   } catch (err) {
     next(err);
@@ -223,7 +264,7 @@ router.post('/products/:productId/adjust', async (req, res, next) => {
       productId,
       body.movementType as any,
       { adjustmentQuantity: body.adjustmentQuantity, reason: body.reason, referenceId: body.referenceId },
-      req.user?.sub ?? 'system',
+      req.user?.sub ?? SYSTEM_USER_ID,
     );
     res.json(successResponse(result, 'Stock adjusted'));
   } catch (err) {

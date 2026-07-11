@@ -25,7 +25,7 @@ interface DashboardStore {
 
 export const useDashboardStore = create<DashboardStore>((set) => ({
   stores: [],
-  selectedStoreId: localStorage.getItem('storeId') || '',
+  selectedStoreId: localStorage.getItem('store_id') || '',
   revenuePeriod: '7d',
   revenueChart: [],
   inventoryAlerts: [],
@@ -36,7 +36,7 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
 
   setStores: (stores) => set({ stores }),
   setSelectedStore: (id) => {
-    localStorage.setItem('storeId', id);
+    localStorage.setItem('store_id', id);
     set({ selectedStoreId: id });
   },
   setRevenuePeriod: (revenuePeriod) => set({ revenuePeriod }),

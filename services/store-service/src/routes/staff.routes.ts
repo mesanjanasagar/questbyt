@@ -1,10 +1,24 @@
 import { Router, IRouter } from 'express';
 import { z } from 'zod';
-import { getStaffByStore, getStaffById, updateStaff, deleteStaff } from '../services/staff.service';
-import { authenticate, requireManagerOrAdmin, requireAdmin } from '../middleware/authenticate';
+import { getStaffByStore, getStaffById, getStaffByUserId, updateStaff, deleteStaff } from '../services/staff.service';
+import { authenticate, requireManagerOrAdmin, requireAdmin, type AuthenticatedRequest } from '../middleware/authenticate';
 
 const router: IRouter = Router();
 router.use(authenticate);
+
+// GET /staff/me — return the logged-in user's staff profile (used by POS to get branchId)
+router.get('/me', async (req: AuthenticatedRequest, res, next) => {
+  try {
+    const profile = await getStaffByUserId(req.userId!);
+    if (!profile) {
+      res.status(404).json({ success: false, error: 'No staff profile found for this user' });
+      return;
+    }
+    res.json({ success: true, data: profile });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // GET /staff?storeId= — list all staff for a store
 router.get('/', async (req, res, next) => {

@@ -206,8 +206,8 @@ export const BranchesPage: React.FC = () => {
         title="Branch Management"
         description="Manage your restaurant locations and dining areas"
         actions={canCreate ? (
-          <Button variant="primary" size="sm" onClick={openCreate}>
-            <PlusIcon size={16} className="mr-1.5" /> Add Branch
+          <Button variant="primary" size="sm" icon={<PlusIcon size={16} />} onClick={openCreate}>
+            Add Branch
           </Button>
         ) : undefined}
       />

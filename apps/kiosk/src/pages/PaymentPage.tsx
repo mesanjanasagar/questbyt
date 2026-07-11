@@ -8,8 +8,6 @@ const PAYMENT_METHODS = [
   { id: 'mobile', label: 'Mobile Pay', icon: '📱' },
 ] as const;
 
-const STORE_ID = localStorage.getItem('storeId') || 'default-store';
-
 export const PaymentPage: React.FC = () => {
   const { cart, cartTotal, setStep, setOrderConfirmed, clearCart } = useKioskStore();
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
@@ -17,20 +15,27 @@ export const PaymentPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const total = cartTotal();
 
+  // Read at render time so it picks up the value set by the setup screen
+  const storeId = import.meta.env.VITE_STORE_ID || localStorage.getItem('storeId') || '';
+
   const handlePay = async () => {
     if (!selectedMethod) return;
+    if (!storeId) {
+      setError('Kiosk is not configured. Please contact staff.');
+      return;
+    }
     setProcessing(true);
     setError(null);
 
     try {
       const order = await kioskAPI.createOrder(
-        STORE_ID,
+        storeId,
         cart.map((item) => ({
           menuItemId: item.menuItemId,
           quantity: item.quantity,
+          unitPrice: item.price + item.selectedModifiers.reduce((s, m) => s + m.price, 0),
           modifiers: item.selectedModifiers.map((m) => m.modifierId),
         })),
-        'kiosk'
       );
 
       await kioskAPI.processPayment(order.id, selectedMethod, total);

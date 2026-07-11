@@ -11,9 +11,16 @@ declare global {
   }
 }
 
+// Services that call order-service internally (unauthenticated by end-user
+// JWT). customer-service needs GET /orders/:id to resolve which customer an
+// order belongs to when a payment.processed event comes in — without it,
+// recordOrderForCustomer never fires and loyalty points/totalOrders never
+// update, even though the order really did have a customer attached.
+const TRUSTED_INTERNAL_SERVICES = ['payment-service', 'customer-service'];
+
 export function authenticate(req: Request, res: Response, next: NextFunction): void {
   // Allow internal service-to-service calls
-  if (req.headers['x-internal-service'] === 'payment-service') {
+  if (TRUSTED_INTERNAL_SERVICES.includes(req.headers['x-internal-service'] as string)) {
     next();
     return;
   }

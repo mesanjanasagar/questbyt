@@ -1,142 +1,182 @@
-import React, { useState, useEffect } from 'react';
-import { Order, OrderItem } from '../types';
-import { formatDistanceToNow } from 'date-fns';
-import { ordersAPI } from '../api/orders';
+import { useState } from 'react';
+import type { KDSOrder, KDSOrderItem, KDSColumn } from '../types';
+import { getOrderProgress } from '../types';
 
 interface OrderCardProps {
-  order: Order;
-  onStatusChange: (order: Order) => void;
+  order: KDSOrder;
+  column: KDSColumn;
+  onItemStatus: (orderId: string, itemId: string, status: KDSOrderItem['status']) => Promise<void>;
 }
 
-export const OrderCard: React.FC<OrderCardProps> = ({ order, onStatusChange }) => {
-  const [updating, setUpdating] = useState(false);
-  const createdTime = new Date(order.createdAt);
-  const elapsedMinutes = Math.floor((Date.now() - createdTime.getTime()) / 60000);
+const ITEM_NEXT: Record<KDSOrderItem['status'], KDSOrderItem['status'] | null> = {
+  pending: 'accepted',
+  accepted: 'preparing',
+  preparing: 'ready',
+  ready: 'collected',
+  collected: 'served',
+  served: null,
+  cancelled: null,
+};
 
-  // Color coding: green (0-15 min), yellow (15-30 min), red (30+ min)
-  const getUrgencyColor = () => {
-    if (elapsedMinutes < 15) return 'border-green-500 bg-green-50';
-    if (elapsedMinutes < 30) return 'border-yellow-500 bg-yellow-50';
-    return 'border-red-500 bg-red-50';
-  };
+const ITEM_NEXT_LABEL: Record<string, string> = {
+  pending: 'Accept',
+  accepted: 'Preparing',
+  preparing: 'Ready',
+  ready: 'Collected',
+  collected: 'Served',
+};
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-gray-100 text-gray-800';
-      case 'in-progress':
-        return 'bg-blue-100 text-blue-800';
-      case 'ready':
-        return 'bg-green-100 text-green-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+const ITEM_STATUS_STYLE: Record<KDSOrderItem['status'], string> = {
+  pending: 'bg-orange-900/40 border-orange-700 text-orange-300',
+  accepted: 'bg-blue-900/40 border-blue-700 text-blue-300',
+  preparing: 'bg-yellow-900/40 border-yellow-700 text-yellow-300',
+  ready: 'bg-green-900/40 border-green-700 text-green-300',
+  collected: 'bg-teal-900/30 border-teal-800 text-teal-400',
+  served: 'bg-neutral-800 border-neutral-700 text-neutral-500 line-through',
+  cancelled: 'bg-neutral-900 border-neutral-800 text-neutral-600 line-through',
+};
 
-  const handleStatusAdvance = async () => {
-    if (updating) return;
-    setUpdating(true);
+function elapsed(createdAt: string): string {
+  const mins = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
+  if (mins < 1) return '<1m';
+  return `${mins}m`;
+}
 
-    const nextStatus = order.status === 'pending' ? 'in-progress' : 'ready';
+function urgencyStyle(createdAt: string): string {
+  const mins = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000);
+  if (mins < 15) return 'border-neutral-700';
+  if (mins < 30) return 'border-yellow-600';
+  return 'border-red-600';
+}
+
+export function OrderCard({ order, column: _column, onItemStatus }: OrderCardProps) {
+  const [updating, setUpdating] = useState<string | null>(null);
+
+  // Cancelled items are dropped entirely — everything else (including
+  // collected/served) stays visible so the kitchen can see what's already
+  // been handed off, matching a real expo board.
+  const visibleItems = order.items.filter((i) => i.kdsDispatchedAt && i.status !== 'cancelled');
+  const progress = getOrderProgress(order);
+
+  async function advanceItem(item: KDSOrderItem) {
+    const next = ITEM_NEXT[item.status];
+    if (!next || updating) return;
+    setUpdating(item.id);
     try {
-      const updated = await ordersAPI.updateOrderStatus(order.id, nextStatus);
-      onStatusChange(updated);
-    } catch (err) {
-      console.error('Failed to update order:', err);
+      await onItemStatus(order.id, item.id, next);
     } finally {
-      setUpdating(false);
+      setUpdating(null);
     }
-  };
+  }
 
-  const handleItemComplete = async (item: OrderItem) => {
-    if (updating) return;
-    setUpdating(true);
-
-    try {
-      const updated = await ordersAPI.updateItemStatus(order.id, item.id, 'ready');
-      onStatusChange(updated);
-    } catch (err) {
-      console.error('Failed to update item:', err);
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  const allItemsReady = order.items.every((item) => item.status === 'ready' || item.status === 'served');
+  const tableLabel = order.tableNumber != null ? `Table ${order.tableNumber}` : null;
 
   return (
-    <div className={`border-4 rounded-lg p-4 ${getUrgencyColor()} shadow-lg`}>
-      <div className="flex justify-between items-start mb-3">
-        <div>
-          <h3 className="text-2xl font-bold">Order #{order.orderNumber}</h3>
-          <p className="text-sm text-gray-600">
-            {formatDistanceToNow(createdTime, { addSuffix: true })} ({elapsedMinutes}m)
-          </p>
-        </div>
-        <div className="text-right">
-          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusColor(order.status)}`}>
-            {order.status.toUpperCase()}
+    <div className={`bg-neutral-900 border-2 ${urgencyStyle(order.createdAt)} rounded-xl overflow-hidden`}>
+      {/* Card header */}
+      <div className="flex items-center justify-between px-4 py-3 bg-neutral-800/60 border-b border-neutral-700">
+        <div className="flex items-center gap-2">
+          <span className="font-black text-white text-base">#{order.orderNumber}</span>
+          {tableLabel && (
+            <span className="bg-brand-700/60 text-brand-200 text-xs font-bold px-2 py-0.5 rounded-lg">
+              {tableLabel}
+            </span>
+          )}
+          <span className="text-xs text-neutral-500 capitalize">
+            {order.orderType === 'dine-in' ? 'Dine-In' : order.orderType === 'takeout' ? 'Take-Away' : 'Delivery'}
           </span>
-          <p className="text-sm text-gray-600 mt-1">
-            {order.orderType === 'dine-in' && '🍽 Dine-In'}
-            {order.orderType === 'takeout' && '🥡 Takeout'}
-            {order.orderType === 'delivery' && '🛵 Delivery'}
-          </p>
         </div>
+        <span className="text-xs font-bold text-neutral-400">{elapsed(order.createdAt)}</span>
       </div>
 
-      <div className="space-y-2 mb-4 max-h-40 overflow-y-auto">
-        {order.items.map((item) => (
-          <div
-            key={item.id}
-            className={`p-2 rounded flex justify-between items-center cursor-pointer transition ${
-              item.status === 'ready' || item.status === 'served'
-                ? 'bg-green-200 line-through'
-                : item.status === 'in-progress'
-                ? 'bg-blue-200'
-                : 'bg-white border border-gray-300'
-            }`}
-            onClick={() => handleItemComplete(item)}
-          >
-            <div className="flex-1">
-              <p className="font-semibold">
-                {item.quantity}x {item.itemName}
-              </p>
-              {item.modifiers.length > 0 && (
-                <p className="text-xs text-gray-600">
-                  {item.modifiers.map((m) => `${m.name}: ${m.value}`).join(', ')}
+      {/* Progress bar — X/Y items ready, updates as items change state */}
+      {progress.total > 0 && (
+        <div className="px-4 py-2 bg-neutral-800/30 border-b border-neutral-800">
+          <div className="flex items-center justify-between text-[11px] font-semibold text-neutral-400 mb-1">
+            <span>{progress.ready} / {progress.total} Ready</span>
+            <span>{progress.percent}%</span>
+          </div>
+          <div className="h-1.5 bg-neutral-800 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${progress.percent === 100 ? 'bg-green-500' : 'bg-blue-500'}`}
+              style={{ width: `${progress.percent}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Order-level kitchen note */}
+      {order.notes && (
+        <div className="px-4 py-2 bg-amber-900/30 border-b border-amber-800/60">
+          <p className="text-xs text-amber-300 italic">📝 {order.notes}</p>
+        </div>
+      )}
+
+      {/* Items */}
+      <div className="p-3 space-y-2">
+        {visibleItems.length === 0 && (
+          <p className="text-xs text-neutral-500 text-center py-3">No active items</p>
+        )}
+        {visibleItems.map((item) => {
+          const nextStatus = ITEM_NEXT[item.status];
+          const nextLabel = ITEM_NEXT_LABEL[item.status];
+          const isUpdating = updating === item.id;
+          const isOptionalStep = item.status === 'collected'; // "Served" is optional per spec
+
+          return (
+            <div
+              key={item.id}
+              className={`flex items-start gap-3 p-3 rounded-lg border ${ITEM_STATUS_STYLE[item.status]}`}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-sm leading-tight">
+                  <span className="text-white">{item.quantity}×</span>{' '}
+                  {item.itemName ?? item.menuItemId.slice(0, 8)}
                 </p>
+                {item.modifications && item.modifications.length > 0 && (
+                  <p className="text-xs opacity-70 mt-0.5">
+                    {item.modifications.map((m) => m.modifierName).join(', ')}
+                  </p>
+                )}
+                {item.notes && (
+                  <p className="text-xs italic opacity-70 mt-0.5">{item.notes}</p>
+                )}
+              </div>
+
+              {nextStatus && nextLabel && (
+                <button
+                  onClick={() => advanceItem(item)}
+                  disabled={isUpdating}
+                  className={`shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all active:scale-95 ${
+                    isOptionalStep
+                      ? 'bg-transparent border border-neutral-600 text-neutral-400 hover:border-neutral-400 hover:text-neutral-200'
+                      : item.status === 'pending'
+                      ? 'bg-orange-600 hover:bg-orange-500 text-white'
+                      : item.status === 'accepted'
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                      : item.status === 'ready'
+                      ? 'bg-teal-600 hover:bg-teal-500 text-white'
+                      : 'bg-green-600 hover:bg-green-500 text-white'
+                  } disabled:opacity-50`}
+                >
+                  {isUpdating ? '…' : nextLabel}
+                </button>
+              )}
+
+              {(item.status === 'ready' || item.status === 'collected' || item.status === 'served') && (
+                <span className="shrink-0 text-green-400 text-lg font-bold">✓</span>
               )}
             </div>
-            <span className="text-xs font-bold bg-gray-200 px-2 py-1 rounded">
-              {item.station.toUpperCase()}
-            </span>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {order.status === 'pending' && (
-        <button
-          onClick={handleStatusAdvance}
-          disabled={updating}
-          className="w-full py-3 rounded-lg font-bold text-lg transition bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          {updating ? 'Updating...' : '▶ Start Order'}
-        </button>
-      )}
-      {order.status === 'in-progress' && (
-        <button
-          onClick={handleStatusAdvance}
-          disabled={!allItemsReady || updating}
-          className={`w-full py-3 rounded-lg font-bold text-lg transition ${
-            allItemsReady
-              ? 'bg-green-600 hover:bg-green-700 text-white'
-              : 'bg-gray-300 text-gray-600 cursor-not-allowed'
-          }`}
-        >
-          {updating ? 'Updating...' : allItemsReady ? '✓ Mark Order Ready' : 'Complete all items first'}
-        </button>
+      {/* Summary footer when the whole order has reached ready-or-beyond */}
+      {progress.total > 0 && progress.percent === 100 && (
+        <div className="px-4 py-2.5 bg-green-900/30 border-t border-green-800 text-center">
+          <span className="text-green-300 text-xs font-bold">✓ ALL ITEMS READY</span>
+        </div>
       )}
     </div>
   );
-};
+}

@@ -76,6 +76,68 @@ CREATE TABLE IF NOT EXISTS order_audit (
 );
 
 CREATE INDEX IF NOT EXISTS idx_order_audit_order ON order_audit(order_id);
+
+-- Add order_number sequence (idempotent)
+CREATE SEQUENCE IF NOT EXISTS orders_order_number_seq START 1;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_number BIGINT NOT NULL DEFAULT nextval('orders_order_number_seq');
+
+-- ── v2: dine-in workflow ─────────────────────────────────────────────────────
+
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+ALTER TABLE orders ADD CONSTRAINT orders_status_check
+  CHECK (status IN ('pending','cooking','ready','completed','cancelled','open','in_progress','bill_requested','paid','closed'));
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS table_id UUID;
+CREATE INDEX IF NOT EXISTS idx_orders_table_active ON orders(table_id, status)
+  WHERE table_id IS NOT NULL;
+
+ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_status_check;
+ALTER TABLE order_items ADD CONSTRAINT order_items_status_check
+  CHECK (status IN ('pending','cooking','ready','served','accepted','preparing','collected','cancelled'));
+
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS item_name TEXT;
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS kds_dispatched_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_order_items_kds_undispatched ON order_items(order_id)
+  WHERE kds_dispatched_at IS NULL;
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS guest_count INT;
+
+-- ── v3: today's-sales reporting ─────────────────────────────────────────────
+-- Set precisely at the moment payment_status flips to 'paid' (markOrderPaid),
+-- distinct from updated_at which is touched by unrelated later writes.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS paid_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_orders_paid_at ON orders(store_id, paid_at) WHERE paid_at IS NOT NULL;
+
+-- ── v4: branch scoping ───────────────────────────────────────────────────────
+-- A store can span multiple physical branches, each with its own tables
+-- (table_number is only unique per-branch, not per-store). Order listings
+-- must filter by branch_id, not just store_id, or staff at one branch can
+-- see — and appear to be serving — another branch's tables and orders.
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS branch_id UUID;
+CREATE INDEX IF NOT EXISTS idx_orders_branch ON orders(branch_id, created_at DESC) WHERE branch_id IS NOT NULL;
+
+-- ── v5: promo codes ──────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS promo_codes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  store_id UUID NOT NULL,
+  code VARCHAR(50) NOT NULL,
+  description VARCHAR(255),
+  discount_type VARCHAR(20) NOT NULL CHECK (discount_type IN ('percentage','fixed')),
+  discount_value DECIMAL(10,2) NOT NULL CHECK (discount_value > 0),
+  first_time_customer_only BOOLEAN NOT NULL DEFAULT FALSE,
+  min_order_amount DECIMAL(10,2),
+  max_uses INT,
+  used_count INT NOT NULL DEFAULT 0,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  expires_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (store_id, code)
+);
+CREATE INDEX IF NOT EXISTS idx_promo_codes_store ON promo_codes(store_id, is_active);
+
+ALTER TABLE order_discounts ADD COLUMN IF NOT EXISTS promo_code_id UUID REFERENCES promo_codes(id);
+ALTER TABLE order_discounts ADD COLUMN IF NOT EXISTS promo_code VARCHAR(50);
 `;
 
 async function runMigrations(): Promise<void> {

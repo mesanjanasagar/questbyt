@@ -82,7 +82,7 @@ const ROLE_PERMISSIONS: Record<UserRole, string[]> = {
   admin: ['all:*'],
   manager: [
     'order:view_all', 'inventory:manage', 'device:manage',
-    'reports:view', 'user:create', 'user:edit', 'refund:approve',
+    'reports:view', 'user:create', 'user:edit', 'refund:approve', 'promo:manage',
   ],
   cashier: ['order:create', 'order:view_own', 'order:close', 'payment:process', 'refund:request'],
   kitchen: ['order:view', 'order:status_update', 'inventory:view'],

@@ -6,7 +6,7 @@ const configSchema = z.object({
   JWT_SECRET: z.string().min(32),
   // Downstream service URLs
   REPORTING_SERVICE_URL: z.string().default('http://localhost:3008'),
-  CUSTOMER_SERVICE_URL: z.string().default('http://localhost:3006'),
+  CUSTOMER_SERVICE_URL: z.string().default('http://localhost:3012'),
   MARKETING_SERVICE_URL: z.string().default('http://localhost:3014'),
   INVENTORY_SERVICE_URL: z.string().default('http://localhost:3002'),
   // WhatsApp Business API

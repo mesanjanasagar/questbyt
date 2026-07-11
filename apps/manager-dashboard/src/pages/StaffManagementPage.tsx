@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   PageHeader, Card, CardBody, Button, Input, Badge, Modal,
   Table, EmptyState, Spinner, useToast,
-  PlusIcon, EditIcon, TrashIcon, UserCheckIcon,
+  PlusIcon, EditIcon, TrashIcon, UserCheckIcon, EyeIcon, EyeOffIcon,
 } from '@pos/ui';
 import type { Column } from '@pos/ui';
 import { useAuth } from '../contexts/AuthContext';
@@ -32,6 +32,7 @@ export const StaffManagementPage: React.FC = () => {
   const [loading, setLoading]   = useState(true);
 
   const [createModal, setCreateModal] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [editModal, setEditModal]     = useState(false);
   const [editTarget, setEditTarget]   = useState<StaffRow | null>(null);
   const [saving, setSaving]           = useState(false);
@@ -227,8 +228,8 @@ export const StaffManagementPage: React.FC = () => {
         title="Staff Management"
         description="Manage team members, roles, and branch assignments"
         actions={canCreate ? (
-          <Button variant="primary" size="sm" onClick={openCreate}>
-            <PlusIcon size={16} className="mr-1.5" /> Add Staff Member
+          <Button variant="primary" size="sm" icon={<PlusIcon size={16} />} onClick={openCreate}>
+            Add Staff Member
           </Button>
         ) : undefined}
       />
@@ -288,7 +289,18 @@ export const StaffManagementPage: React.FC = () => {
           </div>
           <div>
             <label className="field-label">Password *</label>
-            <Input type="password" value={createForm.password} onChange={(e) => { setCreateForm({ ...createForm, password: e.target.value }); setCreateErrors((p) => ({ ...p, password: '' })); }} placeholder="Min 8 characters" className={createErrors.password ? 'border-red-400' : ''} />
+            <Input
+              type={showPassword ? 'text' : 'password'}
+              value={createForm.password}
+              onChange={(e) => { setCreateForm({ ...createForm, password: e.target.value }); setCreateErrors((p) => ({ ...p, password: '' })); }}
+              placeholder="Min 8 characters"
+              className={createErrors.password ? 'border-red-400' : ''}
+              suffix={
+                <button type="button" onClick={() => setShowPassword((s) => !s)} className="text-neutral-400 hover:text-neutral-600" tabIndex={-1}>
+                  {showPassword ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+                </button>
+              }
+            />
             {createErrors.password && <p className="text-xs text-red-500 mt-1">{createErrors.password}</p>}
           </div>
           <div className="grid grid-cols-2 gap-4">

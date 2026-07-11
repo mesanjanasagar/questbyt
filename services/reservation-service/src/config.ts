@@ -7,7 +7,7 @@ const configSchema = z.object({
   KAFKA_BROKER_URL: z.string().default('localhost:9092'),
   JWT_SECRET: z.string().min(32),
   NOTIFICATION_SERVICE_URL: z.string().default('http://localhost:3007'),
-  CUSTOMER_SERVICE_URL: z.string().default('http://localhost:3008'),
+  CUSTOMER_SERVICE_URL: z.string().default('http://localhost:3012'),
 });
 
 const parsed = configSchema.safeParse(process.env);

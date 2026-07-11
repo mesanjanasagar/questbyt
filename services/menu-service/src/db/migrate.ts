@@ -112,6 +112,19 @@ CREATE TABLE IF NOT EXISTS menu_item_ingredients (
   UNIQUE (menu_item_id, inventory_product_id)
 );
 CREATE INDEX IF NOT EXISTS idx_ingredients_item ON menu_item_ingredients(menu_item_id);
+
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS is_recommended BOOLEAN DEFAULT FALSE;
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS hide_online BOOLEAN DEFAULT FALSE;
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS available_from_time TIME;
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS available_to_time TIME;
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS available_days VARCHAR(50);
+
+-- Veg/non-veg indicator — nullable so existing items just show no mark until
+-- someone sets it, rather than forcing a value onto every item at once.
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS dietary_type VARCHAR(20);
+ALTER TABLE menu_items DROP CONSTRAINT IF EXISTS menu_items_dietary_type_check;
+ALTER TABLE menu_items ADD CONSTRAINT menu_items_dietary_type_check
+  CHECK (dietary_type IS NULL OR dietary_type IN ('veg','non_veg'));
 `;
 
 async function runMigrations(): Promise<void> {

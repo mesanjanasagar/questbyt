@@ -7,6 +7,7 @@ const configSchema = z.object({
   REDIS_URL: z.string().default('redis://localhost:6379'),
   JWT_SECRET: z.string().min(32),
   MENU_CACHE_TTL: z.coerce.number().default(3600), // 1 hour
+  INVENTORY_SERVICE_URL: z.string().default('http://localhost:3002'),
 });
 
 const parsed = configSchema.safeParse(process.env);

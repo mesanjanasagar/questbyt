@@ -154,7 +154,7 @@ export default function CheckoutModal({
                   value={cashTendered}
                   onChange={(e) => { setCashTendered(e.target.value); setError(''); }}
                   placeholder={`Min. AED ${totalAmount.toFixed(2)}`}
-                  className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                  className={`w-full border rounded-lg px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 bg-white focus:outline-none focus:ring-2 focus:ring-primary-500 ${
                     cashIsInsufficient ? 'border-red-400 bg-red-50' : 'border-gray-300'
                   }`}
                 />

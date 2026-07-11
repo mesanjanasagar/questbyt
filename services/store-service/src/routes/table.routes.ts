@@ -55,7 +55,7 @@ router.get('/by-area/:diningAreaId', async (req, res, next) => {
 router.patch('/:tableId/status', async (req, res, next) => {
   try {
     const { status } = z.object({
-      status: z.enum(['available', 'occupied', 'reserved', 'cleaning']),
+      status: z.enum(['available', 'occupied', 'reserved', 'cleaning', 'food_preparing', 'ready_to_serve', 'bill_requested', 'paid']),
     }).parse(req.body);
     const table = await updateTableStatus(req.params.tableId, status);
     res.json({ success: true, data: table });

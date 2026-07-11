@@ -28,6 +28,12 @@ function mapStaff(row: StaffRow): StaffProfile {
   };
 }
 
+export async function getStaffByUserId(userId: string): Promise<StaffProfile | null> {
+  const result = await db.query(`SELECT * FROM staff_profiles WHERE user_id = $1 LIMIT 1`, [userId]);
+  if (!result.rowCount || result.rowCount === 0) return null;
+  return mapStaff(result.rows[0] as StaffRow);
+}
+
 export async function getStaffById(staffId: string): Promise<StaffProfile> {
   const result = await db.query(`SELECT * FROM staff_profiles WHERE id = $1`, [staffId]);
   if (!result.rowCount || result.rowCount === 0) throw new NotFoundError(`Staff ${staffId} not found`);

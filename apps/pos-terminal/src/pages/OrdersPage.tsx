@@ -1,10 +1,11 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
 import { listOrders } from '../api/orders';
+import { getMyStaffProfile } from '../api/tables';
 import CheckoutModal from '../components/CheckoutModal';
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import type { Order } from '@pos/shared-types';
+import type { Order, StaffProfile } from '@pos/shared-types';
 
 const STATUS_COLORS: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-800',
@@ -20,9 +21,17 @@ export default function OrdersPage() {
   const storeId = useAuthStore((s) => s.user?.storeId ?? '');
   const [checkoutOrder, setCheckoutOrder] = useState<Order | null>(null);
 
+  const { data: staffProfile } = useQuery<StaffProfile>({
+    queryKey: ['staff-me'],
+    queryFn: getMyStaffProfile,
+    staleTime: 1000 * 60 * 10,
+    retry: 1,
+  });
+  const branchId = staffProfile?.branchId;
+
   const { data, isLoading } = useQuery({
-    queryKey: ['orders', storeId],
-    queryFn: () => listOrders({ storeId }),
+    queryKey: ['orders', storeId, branchId],
+    queryFn: () => listOrders({ storeId, branchId }),
     enabled: !!storeId,
     refetchInterval: 10000, // poll every 10s
   });

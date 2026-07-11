@@ -10,6 +10,12 @@ export interface Payment {
   cashTendered?: number;
   changeDue?: number;
   metadata?: Record<string, unknown>;
+  // Only populated on the response from POST /payments/process — lets the
+  // caller know whether this payment covered the order's full remaining
+  // balance (relevant for split-bill flows where several partial payments
+  // are collected against the same order).
+  remainingBalance?: number;
+  isFullyPaid?: boolean;
   createdAt: string;
   processedAt?: string;
 }

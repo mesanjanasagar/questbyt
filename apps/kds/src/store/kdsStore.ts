@@ -1,40 +1,56 @@
 import { create } from 'zustand';
-import { Order, KDSFilter } from '../types';
+import type { KDSOrder, KDSOrderItem, KDSFilter } from '../types';
 
 interface KDSStore {
-  orders: Order[];
+  orders: KDSOrder[];
   filter: KDSFilter;
-  selectedOrder: Order | null;
 
-  setOrders: (orders: Order[]) => void;
-  addOrder: (order: Order) => void;
-  updateOrder: (order: Order) => void;
+  setOrders: (orders: KDSOrder[]) => void;
+  upsertOrder: (order: KDSOrder) => void;
+  appendItems: (orderId: string, items: KDSOrderItem[]) => void;
+  updateItemStatus: (orderId: string, itemId: string, status: KDSOrderItem['status']) => void;
   removeOrder: (orderId: string) => void;
-
   setFilter: (filter: KDSFilter) => void;
-  setSelectedOrder: (order: Order | null) => void;
 }
 
 export const useKDSStore = create<KDSStore>((set) => ({
   orders: [],
-  filter: {
-    orderType: 'all',
-    station: 'all',
-  },
-  selectedOrder: null,
+  filter: { orderType: 'all' },
 
   setOrders: (orders) => set({ orders }),
-  addOrder: (order) => set((state) => ({ orders: [order, ...state.orders] })),
-  updateOrder: (order) =>
+
+  upsertOrder: (order) =>
+    set((state) => {
+      const exists = state.orders.some((o) => o.id === order.id);
+      if (exists) {
+        return { orders: state.orders.map((o) => (o.id === order.id ? order : o)) };
+      }
+      return { orders: [order, ...state.orders] };
+    }),
+
+  appendItems: (orderId, items) =>
     set((state) => ({
-      orders: state.orders.map((o) => (o.id === order.id ? order : o)),
-      selectedOrder: state.selectedOrder?.id === order.id ? order : state.selectedOrder,
-    })),
-  removeOrder: (orderId) =>
-    set((state) => ({
-      orders: state.orders.filter((o) => o.id !== orderId),
+      orders: state.orders.map((o) => {
+        if (o.id !== orderId) return o;
+        const existingIds = new Set(o.items.map((i) => i.id));
+        const newItems = items.filter((i) => !existingIds.has(i.id));
+        return { ...o, items: [...o.items, ...newItems] };
+      }),
     })),
 
+  updateItemStatus: (orderId, itemId, status) =>
+    set((state) => ({
+      orders: state.orders.map((o) => {
+        if (o.id !== orderId) return o;
+        return {
+          ...o,
+          items: o.items.map((i) => (i.id === itemId ? { ...i, status } : i)),
+        };
+      }),
+    })),
+
+  removeOrder: (orderId) =>
+    set((state) => ({ orders: state.orders.filter((o) => o.id !== orderId) })),
+
   setFilter: (filter) => set({ filter }),
-  setSelectedOrder: (order) => set({ selectedOrder: order }),
 }));

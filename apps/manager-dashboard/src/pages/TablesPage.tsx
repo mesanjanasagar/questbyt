@@ -166,8 +166,8 @@ export const TablesPage: React.FC = () => {
             />
             {canCreate && (
               <div className="flex justify-center mt-4">
-                <Button variant="primary" size="sm" onClick={openAddArea}>
-                  <PlusIcon size={14} className="mr-1" /> Add Dining Area
+                <Button variant="primary" size="sm" icon={<PlusIcon size={14} />} onClick={openAddArea}>
+                  Add Dining Area
                 </Button>
               </div>
             )}
@@ -183,8 +183,8 @@ export const TablesPage: React.FC = () => {
                   {area.floorNumber && <p className="text-xs text-neutral-500 mt-0.5">Floor {area.floorNumber}</p>}
                 </div>
                 {canCreate && (
-                  <Button variant="outline" size="sm" onClick={() => openAddTable(area.id)}>
-                    <PlusIcon size={14} className="mr-1" /> Add Table
+                  <Button variant="outline" size="sm" icon={<PlusIcon size={14} />} onClick={() => openAddTable(area.id)}>
+                    Add Table
                   </Button>
                 )}
               </CardHeader>
@@ -220,8 +220,8 @@ export const TablesPage: React.FC = () => {
 
           {/* Add another dining area */}
           {canCreate && (
-            <Button variant="ghost" size="sm" onClick={openAddArea} className="text-neutral-500">
-              <PlusIcon size={14} className="mr-1" /> Add Dining Area
+            <Button variant="ghost" size="sm" icon={<PlusIcon size={14} />} onClick={openAddArea} className="text-neutral-500">
+              Add Dining Area
             </Button>
           )}
         </div>

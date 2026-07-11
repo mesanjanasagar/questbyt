@@ -1,11 +1,12 @@
 import React, { useState, FormEvent } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Button, Input } from '@pos/ui';
+import { Button, Input, EyeIcon, EyeOffIcon } from '@pos/ui';
 
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -55,12 +56,17 @@ export const LoginPage: React.FC = () => {
             <div>
               <label className="field-label">Password</label>
               <Input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 autoComplete="current-password"
+                suffix={
+                  <button type="button" onClick={() => setShowPassword((s) => !s)} className="text-neutral-400 hover:text-neutral-600" tabIndex={-1}>
+                    {showPassword ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+                  </button>
+                }
               />
             </div>
 

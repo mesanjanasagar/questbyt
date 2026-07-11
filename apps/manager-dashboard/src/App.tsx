@@ -4,7 +4,7 @@ import {
   Sidebar, ToastProvider, FullPageSpinner,
   LayoutDashboardIcon, ReceiptIcon, PackageIcon,
   UsersIcon, MegaphoneIcon, AlertTriangleIcon,
-  BuildingIcon, GitBranchIcon, LayoutGridIcon, UserCheckIcon, ShieldIcon, UtensilsIcon,
+  BuildingIcon, GitBranchIcon, LayoutGridIcon, UserCheckIcon, ShieldIcon, UtensilsIcon, TagIcon,
 } from '@pos/ui';
 import type { NavGroup } from '@pos/ui';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -15,6 +15,7 @@ import { OrdersPage } from './pages/OrdersPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { StaffPage } from './pages/StaffPage';
 import { CampaignsPage } from './pages/CampaignsPage';
+import { PromoCodesPage } from './pages/PromoCodesPage';
 import { ChurnPage } from './pages/ChurnPage';
 import { RestaurantPage } from './pages/RestaurantPage';
 import { BranchesPage } from './pages/BranchesPage';
@@ -40,8 +41,9 @@ function buildNavGroups(role: string | undefined): NavGroup[] {
     {
       label: 'Growth',
       items: [
-        { path: '/campaigns', label: 'Campaigns',  icon: <MegaphoneIcon size={18} /> },
-        { path: '/churn',     label: 'Churn Risk', icon: <AlertTriangleIcon size={18} /> },
+        { path: '/campaigns',    label: 'Campaigns',    icon: <MegaphoneIcon size={18} /> },
+        { path: '/promo-codes',  label: 'Promo Codes',  icon: <TagIcon size={18} /> },
+        { path: '/churn',        label: 'Churn Risk',   icon: <AlertTriangleIcon size={18} /> },
       ],
     },
   ];
@@ -137,6 +139,7 @@ function DashboardShell() {
           <Route path="/menu"            element={<MenuPage />} />
           <Route path="/staff"           element={<StaffPage />} />
           <Route path="/campaigns"       element={<CampaignsPage />} />
+          <Route path="/promo-codes"     element={<PromoCodesPage />} />
           <Route path="/churn"           element={<ChurnPage />} />
 
           <Route path="/restaurant" element={

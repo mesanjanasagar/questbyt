@@ -31,11 +31,19 @@ export enum DeviceStatus {
 }
 
 export enum OrderStatus {
+  // Legacy walk-in / takeout lifecycle
   PENDING = 'pending',
   COOKING = 'cooking',
-  READY = 'ready',
   COMPLETED = 'completed',
+  // Shared
+  READY = 'ready',
   CANCELLED = 'cancelled',
+  // Dine-in lifecycle
+  OPEN = 'open',
+  IN_PROGRESS = 'in_progress',
+  BILL_REQUESTED = 'bill_requested',
+  PAID = 'paid',
+  CLOSED = 'closed',
 }
 
 export enum OrderType {
@@ -58,10 +66,30 @@ export enum PaymentMethod {
 }
 
 export enum OrderItemStatus {
-  PENDING = 'pending',
+  // Legacy
   COOKING = 'cooking',
+  // Active statuses
+  PENDING = 'pending',
+  ACCEPTED = 'accepted',
+  PREPARING = 'preparing',
   READY = 'ready',
+  // Waiter has picked the item up from the pass but hasn't necessarily set it
+  // down at the table yet — distinct from READY (kitchen's done) so the KDS
+  // can tell "cooked" apart from "handed off" for expo/pickup tracking.
+  COLLECTED = 'collected',
   SERVED = 'served',
+  CANCELLED = 'cancelled',
+}
+
+export enum TableStatus {
+  AVAILABLE = 'available',
+  OCCUPIED = 'occupied',
+  FOOD_PREPARING = 'food_preparing',
+  READY_TO_SERVE = 'ready_to_serve',
+  BILL_REQUESTED = 'bill_requested',
+  PAID = 'paid',
+  CLEANING = 'cleaning',
+  RESERVED = 'reserved',
 }
 
 export enum InventoryUnitType {
@@ -86,8 +114,14 @@ export enum MenuItemStatus {
   HIDDEN = 'hidden',
 }
 
+export enum DietaryType {
+  VEG = 'veg',
+  NON_VEG = 'non_veg',
+}
+
 export enum Platform {
   DIRECT = 'direct',
+  KIOSK = 'kiosk',
   DELIVEROO = 'deliveroo',
   TALABAT = 'talabat',
   NOON = 'noon',

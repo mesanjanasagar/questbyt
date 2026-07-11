@@ -1,6 +1,14 @@
 import { apiClient } from './client';
 import type { Payment, Refund, ProcessPaymentRequest } from '@pos/shared-types';
 
+export interface PaymentSummary {
+  orderTotal: number | null;
+  totalPaid: number;
+  remainingBalance: number;
+  isFullyPaid: boolean;
+  payments: Payment[];
+}
+
 export async function processPayment(
   data: ProcessPaymentRequest & { storeId: string },
 ): Promise<Payment> {
@@ -11,6 +19,11 @@ export async function processPayment(
 export async function getPaymentByOrderId(orderId: string): Promise<Payment | null> {
   const res = await apiClient.get(`/api/v1/payments/order/${orderId}`);
   return res.data.data as Payment | null;
+}
+
+export async function getPaymentSummary(orderId: string): Promise<PaymentSummary> {
+  const res = await apiClient.get(`/api/v1/payments/order/${orderId}/summary`);
+  return res.data.data as PaymentSummary;
 }
 
 export async function refundPayment(

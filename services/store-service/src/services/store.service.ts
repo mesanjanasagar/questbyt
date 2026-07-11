@@ -225,6 +225,7 @@ export async function updateStoreProfile(
     timezone: string;
     address: StoreAddress;
     operatingHours: OperatingHours[];
+    posCaptureCustomerDetails: boolean;
   }>,
 ): Promise<StoreProfile> {
   await db.query(
@@ -242,6 +243,7 @@ export async function updateStoreProfile(
          timezone         = COALESCE($12, timezone),
          address          = COALESCE($13, address),
          operating_hours  = COALESCE($14, operating_hours),
+         pos_capture_customer_details = COALESCE($15, pos_capture_customer_details),
          updated_at       = NOW()
      WHERE id = $1`,
     [
@@ -252,6 +254,7 @@ export async function updateStoreProfile(
       req.locale ?? null, req.timezone ?? null,
       req.address ? JSON.stringify(req.address) : null,
       req.operatingHours ? JSON.stringify(req.operatingHours) : null,
+      req.posCaptureCustomerDetails ?? null,
     ],
   );
   return getStoreById(storeId);
@@ -433,6 +436,7 @@ function assembleStoreProfile(
     receiptConfig,
     operatingHours: (store.operating_hours as OperatingHours[]) ?? [],
     isActive: store.is_active as boolean,
+    posCaptureCustomerDetails: (store.pos_capture_customer_details as boolean) ?? true,
     createdAt: store.created_at as string,
     updatedAt: store.updated_at as string,
   };

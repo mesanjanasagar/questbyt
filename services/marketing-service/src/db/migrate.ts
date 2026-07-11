@@ -50,6 +50,44 @@ CREATE INDEX IF NOT EXISTS idx_executions_store ON campaign_executions(store_id,
 -- Throttle check: last send per customer per campaign
 CREATE INDEX IF NOT EXISTS idx_executions_throttle ON campaign_executions(campaign_id, customer_id, sent_at DESC)
     WHERE status = 'sent';
+
+-- ── Promo / discount campaign extensions (idempotent) ───────────────────────
+
+-- Relax channel / message_template so discount campaigns can omit them
+ALTER TABLE campaigns ALTER COLUMN channel DROP NOT NULL;
+ALTER TABLE campaigns ALTER COLUMN message_template DROP NOT NULL;
+
+-- Extend status values
+DO $$ BEGIN
+  ALTER TABLE campaigns DROP CONSTRAINT IF EXISTS campaigns_status_check;
+  ALTER TABLE campaigns ADD CONSTRAINT campaigns_status_check
+    CHECK (status IN ('draft','scheduled','active','paused','completed','expired','archived'));
+EXCEPTION WHEN OTHERS THEN NULL; END $$;
+
+-- New columns
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS campaign_type    VARCHAR(50);
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS coupon_code      VARCHAR(100);
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS discount_type    VARCHAR(20);
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS discount_value   DECIMAL(10,2);
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS max_discount     DECIMAL(10,2);
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS min_order_amount DECIMAL(10,2);
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS valid_from       TIMESTAMPTZ;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS valid_until      TIMESTAMPTZ;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS max_redemptions  INT;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS usage_count      INT NOT NULL DEFAULT 0;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS usage_per_customer INT DEFAULT 1;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS priority         INT NOT NULL DEFAULT 0;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS applicable_branches   JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS applicable_segments   JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS applicable_categories JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS applicable_items      JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS revenue_generated     DECIMAL(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS orders_count          INT NOT NULL DEFAULT 0;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS customers_reached     INT NOT NULL DEFAULT 0;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS roi                   DECIMAL(10,2) NOT NULL DEFAULT 0;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_campaigns_coupon ON campaigns(store_id, coupon_code)
+  WHERE coupon_code IS NOT NULL;
 `;
 
 async function runMigrations(): Promise<void> {

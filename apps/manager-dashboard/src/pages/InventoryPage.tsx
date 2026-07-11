@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import {
   PageHeader, Card, CardBody,
   Button, Input, Badge, Modal, EmptyState, Spinner, useToast,
@@ -15,6 +16,52 @@ const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'error' | 'default'
   active: 'success', inactive: 'warning', archived: 'error',
 };
 
+// ─── Bulk Import ────────────────────────────────────────────────────────────
+
+interface ImportRow {
+  name: string;
+  sku: string;
+  description: string;
+  unitType: string;
+  currentStock: string;
+  reorderLevel: string;
+  reorderQuantity: string;
+  _valid: boolean;
+  _error?: string;
+}
+
+const IMPORT_COL_MAP: Record<string, keyof ImportRow> = {
+  name: 'name',
+  sku: 'sku',
+  description: 'description',
+  unit_type: 'unitType',
+  current_stock: 'currentStock',
+  reorder_level: 'reorderLevel',
+  reorder_quantity: 'reorderQuantity',
+};
+
+function parseInventorySheetRows(sheet: XLSX.WorkSheet): ImportRow[] {
+  const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' });
+  return raw.map((r) => {
+    const row: ImportRow = {
+      name: '', sku: '', description: '', unitType: '',
+      currentStock: '', reorderLevel: '', reorderQuantity: '', _valid: true,
+    };
+    for (const [key, val] of Object.entries(r)) {
+      const norm = key.trim().toLowerCase().replace(/[\s/]+/g, '_');
+      const field = IMPORT_COL_MAP[norm];
+      if (field) (row as any)[field] = String(val ?? '').trim();
+    }
+    const errors: string[] = [];
+    if (!row.name) errors.push('name required');
+    if (row.unitType && !UNIT_TYPES.includes(row.unitType.toLowerCase() as any)) {
+      errors.push(`unit_type must be one of ${UNIT_TYPES.join(', ')}`);
+    }
+    if (errors.length) { row._valid = false; row._error = errors.join('; '); }
+    return row;
+  });
+}
+
 export const InventoryPage: React.FC = () => {
   const { storeId } = useAuth();
   const { success, error: toastError } = useToast();
@@ -24,6 +71,16 @@ export const InventoryPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
+
+  // Bulk import modal
+  const [importModal, setImportModal] = useState(false);
+  const [importRows, setImportRows] = useState<ImportRow[]>([]);
+  const [importFileName, setImportFileName] = useState('');
+  const [importDragging, setImportDragging] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ created: number; skipped: number; errors: Array<{ row: number; message: string }> } | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   // Product modal
   const [productModal, setProductModal] = useState(false);
@@ -180,6 +237,108 @@ export const InventoryPage: React.FC = () => {
 
   const handleSearch = () => setSearch(searchInput);
 
+  // ─── Bulk Import ──────────────────────────────────────────────────────────
+
+  const openImportModal = () => {
+    setImportRows([]);
+    setImportFileName('');
+    setImportResult(null);
+    setImportModal(true);
+  };
+
+  const processImportFile = (file: File) => {
+    setImportFileName(file.name);
+    setImportResult(null);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target!.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        setImportRows(parseInventorySheetRows(sheet));
+      } catch {
+        toastError('Could not parse file. Please use CSV or XLSX format.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleImportFileDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setImportDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) processImportFile(file);
+  };
+
+  const handleImportFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processImportFile(file);
+    e.target.value = '';
+  };
+
+  const downloadTemplate = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['name', 'sku', 'description', 'unit_type', 'current_stock', 'reorder_level', 'reorder_quantity'],
+      ['Chicken Breast', 'CHK001', 'Boneless, skinless', 'kg', '25', '5', '20'],
+      ['Basmati Rice', 'RICE001', '', 'kg', '50', '10', '40'],
+      ['Olive Oil', '', 'Extra virgin', 'liter', '12', '3', '10'],
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Inventory Import');
+    XLSX.writeFile(wb, 'Inventory_Import_Template.xlsx');
+  };
+
+  const runImport = async () => {
+    if (!storeId) return;
+    const validRows = importRows.filter((r) => r._valid);
+    if (validRows.length === 0) return;
+    setImporting(true);
+    try {
+      const result = await inventoryAPI.bulkImport({
+        storeId,
+        rows: validRows.map((r) => ({
+          name: r.name,
+          sku: r.sku || undefined,
+          description: r.description || undefined,
+          unitType: r.unitType || undefined,
+          currentStock: r.currentStock ? parseFloat(r.currentStock) : undefined,
+          reorderLevel: r.reorderLevel ? parseFloat(r.reorderLevel) : undefined,
+          reorderQuantity: r.reorderQuantity ? parseFloat(r.reorderQuantity) : undefined,
+        })),
+      });
+      setImportResult(result);
+      await loadProducts();
+    } catch {
+      toastError('Import failed');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const exportProducts = async () => {
+    if (!storeId) return;
+    setExporting(true);
+    try {
+      const result = await inventoryAPI.listWithStock(storeId, { limit: 100 });
+      const all = (result as any).data ?? result;
+      const ws = XLSX.utils.aoa_to_sheet([
+        ['name', 'sku', 'description', 'unit_type', 'current_stock', 'reorder_level', 'reorder_quantity', 'status'],
+        ...all.map((p: InventoryProduct) => [
+          p.name, p.sku ?? '', p.description ?? '', p.unitType,
+          p.inventory?.currentStock ?? '', p.inventory?.reorderLevel ?? '', p.inventory?.reorderQuantity ?? '',
+          p.status,
+        ]),
+      ]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Inventory Export');
+      XLSX.writeFile(wb, `Inventory_Export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    } catch {
+      toastError('Failed to export inventory');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
       <PageHeader title="Inventory" description="Manage products and stock levels" />
@@ -214,8 +373,14 @@ export const InventoryPage: React.FC = () => {
                 <SearchIcon size={14} />
               </Button>
             </div>
-            <Button variant="primary" size="sm" onClick={openAddProduct}>
-              <PlusIcon size={14} className="mr-1" /> Add Product
+            <Button variant="outline" size="sm" loading={exporting} onClick={exportProducts}>
+              Export
+            </Button>
+            <Button variant="outline" size="sm" onClick={openImportModal}>
+              Import CSV / Excel
+            </Button>
+            <Button variant="primary" size="sm" icon={<PlusIcon size={14} />} onClick={openAddProduct}>
+              Add Product
             </Button>
           </div>
 
@@ -230,8 +395,8 @@ export const InventoryPage: React.FC = () => {
                   description="Add your first inventory product to get started."
                 />
                 <div className="flex justify-center mt-4">
-                  <Button variant="primary" size="sm" onClick={openAddProduct}>
-                    <PlusIcon size={14} className="mr-1" /> Add Product
+                  <Button variant="primary" size="sm" icon={<PlusIcon size={14} />} onClick={openAddProduct}>
+                    Add Product
                   </Button>
                 </div>
               </CardBody>
@@ -243,8 +408,8 @@ export const InventoryPage: React.FC = () => {
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-neutral-200 bg-neutral-50">
-                        {['Name / SKU', 'Unit', 'In Stock', 'Available', 'Reorder At', 'Status', ''].map((h, i) => (
-                          <th key={i} className={`py-3 px-4 text-xs font-semibold text-neutral-500 uppercase tracking-wide ${i >= 2 && i <= 4 ? 'text-right' : 'text-left'}`}>
+                        {['Name / SKU', 'Unit', 'In Stock', 'Reserved', 'Available', 'Reorder At', 'Status', ''].map((h, i) => (
+                          <th key={i} className={`py-3 px-4 text-xs font-semibold text-neutral-500 uppercase tracking-wide ${i >= 2 && i <= 5 ? 'text-right' : 'text-left'}`}>
                             {h}
                           </th>
                         ))}
@@ -260,6 +425,18 @@ export const InventoryPage: React.FC = () => {
                           <td className="py-3 px-4 text-neutral-600 capitalize">{p.unitType}</td>
                           <td className="py-3 px-4 text-right tabular-nums font-semibold text-neutral-900">
                             {p.inventory ? p.inventory.currentStock.toFixed(2) : '—'}
+                          </td>
+                          <td className="py-3 px-4 text-right tabular-nums">
+                            {p.inventory ? (
+                              p.inventory.reservedStock > 0 ? (
+                                <span className="inline-flex items-center gap-1 text-warning-600 font-semibold">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-warning-500 inline-block" />
+                                  {p.inventory.reservedStock.toFixed(2)}
+                                </span>
+                              ) : (
+                                <span className="text-neutral-400">0.00</span>
+                              )
+                            ) : '—'}
                           </td>
                           <td className={`py-3 px-4 text-right tabular-nums font-medium ${
                             p.inventory && p.inventory.reorderLevel && p.inventory.availableStock <= p.inventory.reorderLevel
@@ -342,6 +519,159 @@ export const InventoryPage: React.FC = () => {
         </div>
       </Modal>
 
+      {/* Bulk Import Modal */}
+      <Modal
+        isOpen={importModal}
+        onClose={() => setImportModal(false)}
+        title="Bulk Import Inventory"
+        size="lg"
+        footer={
+          importResult ? (
+            <Button variant="primary" size="sm" onClick={() => setImportModal(false)}>Done</Button>
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" onClick={downloadTemplate}>Download Template</Button>
+              <div className="flex-1" />
+              <Button variant="ghost" size="sm" onClick={() => setImportModal(false)}>Cancel</Button>
+              <Button
+                variant="primary" size="sm"
+                loading={importing}
+                disabled={importRows.filter((r) => r._valid).length === 0}
+                onClick={runImport}
+              >
+                Import {importRows.filter((r) => r._valid).length > 0 ? `${importRows.filter((r) => r._valid).length} rows` : ''}
+              </Button>
+            </>
+          )
+        }
+      >
+        {importResult ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-success-50 rounded-lg p-3 text-center">
+                <div className="text-2xl font-bold text-success-700">{importResult.created}</div>
+                <div className="text-xs text-success-600 mt-0.5">Products created</div>
+              </div>
+              <div className="bg-neutral-50 rounded-lg p-3 text-center">
+                <div className="text-2xl font-bold text-neutral-700">{importResult.skipped}</div>
+                <div className="text-xs text-neutral-500 mt-0.5">Skipped (already exist)</div>
+              </div>
+            </div>
+            {importResult.errors.length > 0 && (
+              <div className="rounded-lg border border-error-200 bg-error-50 p-3 space-y-1">
+                <p className="text-xs font-semibold text-error-700">Errors ({importResult.errors.length})</p>
+                {importResult.errors.map((e, i) => (
+                  <p key={i} className="text-xs text-error-600">Row {e.row}: {e.message}</p>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Drop zone */}
+            <div
+              onDragOver={(e) => { e.preventDefault(); setImportDragging(true); }}
+              onDragLeave={() => setImportDragging(false)}
+              onDrop={handleImportFileDrop}
+              onClick={() => importFileRef.current?.click()}
+              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
+                importDragging ? 'border-primary-400 bg-primary-50' : 'border-neutral-200 hover:border-primary-300 hover:bg-neutral-50'
+              }`}
+            >
+              <input
+                ref={importFileRef}
+                type="file"
+                accept=".csv,.xlsx,.xls"
+                className="hidden"
+                onChange={handleImportFileInput}
+              />
+              <p className="text-sm font-medium text-neutral-700">
+                {importFileName ? importFileName : 'Drop your CSV or Excel file here'}
+              </p>
+              <p className="text-xs text-neutral-400 mt-1">
+                {importFileName ? `${importRows.length} rows found` : 'or click to browse — .csv, .xlsx, .xls'}
+              </p>
+            </div>
+
+            {/* Format hint */}
+            {importRows.length === 0 && (
+              <div className="rounded-lg bg-neutral-50 border border-neutral-100 p-3">
+                <p className="text-xs font-semibold text-neutral-500 mb-1.5">Required columns</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {['name'].map((c) => (
+                    <span key={c} className="px-2 py-0.5 bg-white border border-neutral-200 rounded text-xs font-mono text-neutral-700">{c}</span>
+                  ))}
+                </div>
+                <p className="text-xs font-semibold text-neutral-500 mt-2 mb-1.5">Optional columns</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {['sku', 'description', 'unit_type', 'current_stock', 'reorder_level', 'reorder_quantity'].map((c) => (
+                    <span key={c} className="px-2 py-0.5 bg-white border border-neutral-200 rounded text-xs font-mono text-neutral-400">{c}</span>
+                  ))}
+                </div>
+                <div className="mt-2 space-y-1 text-xs text-neutral-400">
+                  <p><span className="font-mono text-neutral-500">unit_type</span> — one of {UNIT_TYPES.join(', ')}. Leave blank to default to "piece".</p>
+                  <p><span className="font-mono text-neutral-500">current_stock</span> — sets opening stock on creation. Leave blank to start at 0.</p>
+                  <p>Products matching an existing SKU or exact name in this store are skipped, not duplicated — safe to re-import the same sheet.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Preview table */}
+            {importRows.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Preview — {importRows.length} rows</p>
+                  <div className="flex gap-3 text-xs">
+                    <span className="text-success-600">{importRows.filter((r) => r._valid).length} valid</span>
+                    {importRows.filter((r) => !r._valid).length > 0 && (
+                      <span className="text-error-600">{importRows.filter((r) => !r._valid).length} invalid</span>
+                    )}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-neutral-200 overflow-hidden">
+                  <div className="overflow-x-auto max-h-64">
+                    <table className="w-full text-xs">
+                      <thead className="bg-neutral-50 sticky top-0">
+                        <tr>
+                          {['#', 'Name', 'SKU', 'Unit', 'Stock', 'Reorder At', ''].map((h) => (
+                            <th key={h} className="px-2 py-2 text-left font-semibold text-neutral-500 whitespace-nowrap">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importRows.map((row, idx) => (
+                          <tr key={idx} className={`border-t border-neutral-100 ${row._valid ? '' : 'bg-error-50'}`}>
+                            <td className="px-2 py-1.5 text-neutral-400">{idx + 2}</td>
+                            <td className="px-2 py-1.5 text-neutral-700 max-w-[140px] truncate">{row.name}</td>
+                            <td className="px-2 py-1.5 text-neutral-500">{row.sku}</td>
+                            <td className="px-2 py-1.5 text-neutral-500">{row.unitType || 'piece'}</td>
+                            <td className="px-2 py-1.5 text-neutral-500">{row.currentStock || '—'}</td>
+                            <td className="px-2 py-1.5 text-neutral-500">{row.reorderLevel || '—'}</td>
+                            <td className="px-2 py-1.5">
+                              {row._valid
+                                ? <span className="text-success-600">✓</span>
+                                : <span className="text-error-600" title={row._error}>✗</span>
+                              }
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                {importRows.some((r) => !r._valid) && (
+                  <div className="space-y-0.5">
+                    {importRows.filter((r) => !r._valid).map((r, i) => (
+                      <p key={i} className="text-xs text-error-600">Row {importRows.indexOf(r) + 2}: {r._error}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
+
       {/* Manage Stock Side Panel */}
       {stockProduct && (
         <div className="fixed inset-0 z-50 flex justify-end">
@@ -351,7 +681,8 @@ export const InventoryPage: React.FC = () => {
               <div>
                 <h2 className="font-semibold text-neutral-900">{stockProduct.name}</h2>
                 <p className="text-xs text-neutral-500 mt-0.5">
-                  Current stock: <span className="font-semibold text-neutral-800">{stockProduct.inventory?.currentStock?.toFixed(2) ?? '0'} {stockProduct.unitType}</span>
+                  In Stock: <span className="font-semibold text-neutral-800">{stockProduct.inventory?.currentStock?.toFixed(2) ?? '0'} {stockProduct.unitType}</span>
+                  {' · '}Reserved: <span className={`font-semibold ${(stockProduct.inventory?.reservedStock ?? 0) > 0 ? 'text-warning-600' : 'text-neutral-800'}`}>{stockProduct.inventory?.reservedStock?.toFixed(2) ?? '0'}</span>
                   {' · '}Available: <span className="font-semibold text-neutral-800">{stockProduct.inventory?.availableStock?.toFixed(2) ?? '0'}</span>
                 </p>
               </div>

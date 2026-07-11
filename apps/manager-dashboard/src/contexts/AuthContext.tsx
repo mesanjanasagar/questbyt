@@ -1,5 +1,9 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import axios from 'axios';
 import api from '../api/client';
+import { useDashboardStore } from '../store/dashboardStore';
+
+const BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api/v1';
 
 interface AuthUser {
   id: string;
@@ -50,11 +54,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Restore session from stored token
   useEffect(() => {
     const restore = async () => {
-      const token = localStorage.getItem('access_token');
-      if (!token) {
+      const accessToken = localStorage.getItem('access_token');
+      const refreshToken = localStorage.getItem('refresh_token');
+      const deviceId = localStorage.getItem('device_id');
+
+      // If no access token but a refresh token exists, proactively obtain a new access token
+      // so we don't need to wait for a 401 to trigger the interceptor refresh.
+      if (!accessToken && refreshToken && deviceId) {
+        try {
+          const { data: refreshData } = await axios.post(`${BASE_URL}/auth/refresh`, {
+            refreshToken,
+            deviceId,
+          });
+          localStorage.setItem('access_token', refreshData.data.accessToken);
+          localStorage.setItem('refresh_token', refreshData.data.refreshToken);
+        } catch {
+          // Refresh token is invalid/expired — clear everything and show login
+          await logout();
+          return;
+        }
+      } else if (!accessToken) {
         setState((s) => ({ ...s, isLoading: false }));
         return;
       }
+
       try {
         const { data } = await api.get('/auth/me');
         const user = data.data ?? data;
@@ -65,7 +88,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           isAuthenticated: true,
           isLoading: false,
         });
-        if (user.storeId) localStorage.setItem('store_id', user.storeId);
+        if (user.storeId) {
+          localStorage.setItem('store_id', user.storeId);
+          if (!useDashboardStore.getState().selectedStoreId) {
+            useDashboardStore.getState().setSelectedStore(user.storeId);
+          }
+        }
       } catch {
         await logout();
       }
@@ -90,6 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('refresh_token', payload.refreshToken);
     localStorage.setItem('device_id', payload.deviceId);
     localStorage.setItem('store_id', payload.user.storeId);
+    if (payload.user.storeId) useDashboardStore.getState().setSelectedStore(payload.user.storeId);
 
     setState({
       user: payload.user,

@@ -24,13 +24,16 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
     return;
   }
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  // SSE clients can't send headers — allow token via ?token= query param
+  const tokenFromQuery = (req.query as Record<string, string>).token;
+
+  if (!authHeader && !tokenFromQuery) {
     res.status(401).json({ success: false, error: 'UNAUTHORIZED', message: 'Missing or invalid token' });
     return;
   }
 
   try {
-    const token = authHeader.slice(7);
+    const token = authHeader ? authHeader.slice(7) : tokenFromQuery!;
     const payload = jwt.verify(token, config.JWT_SECRET) as JwtPayload;
     req.user = payload;
     next();

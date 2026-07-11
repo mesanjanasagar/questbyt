@@ -201,6 +201,16 @@ CREATE TABLE IF NOT EXISTS store_receipt_config (
 -- ON CONFLICT (store_id) works even if the table predates this constraint.
 CREATE UNIQUE INDEX IF NOT EXISTS onboarding_state_store_id_key
     ON onboarding_state (store_id);
+
+-- ── v2: expanded table statuses for dine-in workflow ─────────────────────────
+-- ── v3: added 'paid' — payment closes the order but the table now waits for
+-- staff to mark it cleaned, instead of jumping straight to 'cleaning'.
+ALTER TABLE tables DROP CONSTRAINT IF EXISTS tables_status_check;
+ALTER TABLE tables ADD CONSTRAINT tables_status_check
+  CHECK (status IN ('available','occupied','reserved','cleaning','food_preparing','ready_to_serve','bill_requested','paid'));
+
+-- ── v4: POS customer-capture toggle ──────────────────────────────────────────
+ALTER TABLE stores ADD COLUMN IF NOT EXISTS pos_capture_customer_details BOOLEAN NOT NULL DEFAULT TRUE;
 `;
 
 async function runMigrations(): Promise<void> {

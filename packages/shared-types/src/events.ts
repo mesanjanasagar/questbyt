@@ -6,6 +6,7 @@ export type EventType =
   | 'order.created'
   | 'order.item_added'
   | 'order.item_removed'
+  | 'order.item_updated'
   | 'order.status_updated'
   | 'order.cancelled'
   | 'order.completed'

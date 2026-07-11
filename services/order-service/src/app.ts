@@ -25,7 +25,7 @@ app.use(rateLimit({
   legacyHeaders: false,
 }));
 
-app.use('/api/v1/orders', orderRoutes);
+app.use('/orders', orderRoutes);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'order-service', timestamp: new Date().toISOString() });

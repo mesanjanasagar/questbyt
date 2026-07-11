@@ -54,7 +54,12 @@ async function handleMessage({ message }: EachMessagePayload): Promise<void> {
 async function handlePaymentProcessed(
   event: DomainEvent<PaymentProcessedEvent>,
 ): Promise<void> {
-  const { orderId, storeId, amount } = event.data;
+  // storeId lives on the envelope (event.storeId), not the payload — pulling
+  // it from event.data (as this used to) always produced undefined, which
+  // then failed loyalty_ledger's NOT NULL store_id column and silently
+  // rolled back the whole points/totals update on every single payment.
+  const { orderId, amount } = event.data;
+  const { storeId } = event;
 
   // We need to look up whether this order has a customer_id.
   // The payment event doesn't carry it, so we query order-service via HTTP.
@@ -75,9 +80,15 @@ async function fetchCustomerIdForOrder(
   orderId: string,
   _storeId: string,
 ): Promise<string | null> {
+  // order-service mounts its routes at the bare '/orders' path — '/api/v1'
+  // only exists as a prefix at the gateway, which strips it before
+  // proxying through. Calling order-service directly (as this internal
+  // service-to-service request does) has to skip that prefix, or every
+  // lookup 404s and this silently falls through to "no customer attached",
+  // which is why loyalty points/totalOrders never accrued for anyone.
   const orderServiceUrl = process.env.ORDER_SERVICE_URL ?? 'http://localhost:3001';
   try {
-    const res = await fetch(`${orderServiceUrl}/api/v1/orders/${orderId}`, {
+    const res = await fetch(`${orderServiceUrl}/orders/${orderId}`, {
       headers: { 'X-Internal-Service': 'customer-service' },
     });
     if (!res.ok) return null;

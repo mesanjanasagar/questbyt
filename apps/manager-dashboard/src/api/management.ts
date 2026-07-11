@@ -80,6 +80,7 @@ export interface StoreProfile {
   operatingHours?: Array<{ dayOfWeek: number; openTime: string; closeTime: string; isClosed: boolean }>;
   branding?: { primaryColor?: string; logoUrl?: string; displayName?: string };
   isActive: boolean;
+  posCaptureCustomerDetails: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -255,6 +256,22 @@ export const inventoryAPI = {
 
   getMovements: (productId: string, params?: { page?: number; limit?: number }) =>
     api.get(`/inventory/products/${productId}/movements`, { params }).then(unwrap<{ data: StockMovement[]; total: number; page: number }>),
+
+  bulkImport: (body: {
+    storeId: string;
+    rows: Array<{
+      name: string;
+      sku?: string;
+      description?: string;
+      unitType?: string;
+      currentStock?: number;
+      reorderLevel?: number;
+      reorderQuantity?: number;
+    }>;
+  }) =>
+    api.post('/inventory/products/bulk-import', body).then(
+      unwrap<{ created: number; skipped: number; errors: Array<{ row: number; message: string }> }>
+    ),
 };
 
 // ─── Menu ─────────────────────────────────────────────────────────────────────
@@ -291,9 +308,15 @@ export interface MenuItemRecord {
   calories?: number;
   allergens?: string;
   tags?: string;
+  dietaryType?: 'veg' | 'non_veg';
   status: string;
   sortOrder: number;
   isFeatured: boolean;
+  isRecommended: boolean;
+  hideOnline: boolean;
+  availableFromTime?: string;
+  availableToTime?: string;
+  availableDays?: string;
   inventoryProductId?: string;
   createdAt: string;
   updatedAt: string;
@@ -308,6 +331,41 @@ export interface MenuItemIngredient {
   createdAt: string;
 }
 
+export interface ItemVariantRecord {
+  id: string;
+  menuItemId: string;
+  name: string;
+  price: number;
+  sku?: string;
+  status: 'active' | 'inactive';
+}
+
+export interface ModifierRecord {
+  id: string;
+  groupId: string;
+  name: string;
+  nameAr?: string;
+  priceAdjustment: number;
+  isDefault: boolean;
+  status: 'active' | 'inactive';
+}
+
+export interface ModifierGroupRecord {
+  id: string;
+  storeId: string;
+  name: string;
+  selectionType: 'single' | 'multiple';
+  minSelections: number;
+  maxSelections: number;
+  isRequired: boolean;
+  modifiers: ModifierRecord[];
+}
+
+export interface MenuItemDetailRecord extends MenuItemRecord {
+  variants: ItemVariantRecord[];
+  modifierGroups: ModifierGroupRecord[];
+}
+
 export const menuAPI = {
   listMenus: (storeId: string) =>
     api.get('/menus', { params: { storeId } }).then(unwrap<MenuRecord[]>),
@@ -318,23 +376,62 @@ export const menuAPI = {
   updateMenu: (menuId: string, body: { name?: string; description?: string; isDefault?: boolean }) =>
     api.patch(`/menus/${menuId}`, body).then(unwrap<MenuRecord>),
 
+  deleteMenu: (menuId: string) =>
+    api.delete(`/menus/${menuId}`).then((r) => r.data),
+
   listCategories: (menuId: string) =>
     api.get(`/menus/${menuId}/categories`).then(unwrap<MenuCategory[]>),
 
   createCategory: (menuId: string, body: { storeId: string; name: string; description?: string; displayOrder?: number }) =>
     api.post(`/menus/${menuId}/categories`, body).then(unwrap<MenuCategory>),
 
+  updateCategory: (menuId: string, categoryId: string, body: { name?: string; description?: string; status?: 'active' | 'inactive' | 'hidden' }) =>
+    api.patch(`/menus/${menuId}/categories/${categoryId}`, body).then(unwrap<MenuCategory>),
+
+  deleteCategory: (menuId: string, categoryId: string) =>
+    api.delete(`/menus/${menuId}/categories/${categoryId}`).then((r) => r.data),
+
   listItems: (categoryId: string) =>
     api.get('/items', { params: { categoryId } }).then(unwrap<MenuItemRecord[]>),
 
-  createItem: (body: { categoryId: string; storeId: string; name: string; description?: string; basePrice: number; taxRate?: number; sku?: string; inventoryProductId?: string }) =>
+  createItem: (body: { categoryId: string; storeId: string; name: string; description?: string; basePrice: number; taxRate?: number; sku?: string; dietaryType?: 'veg' | 'non_veg'; inventoryProductId?: string }) =>
     api.post('/items', body).then(unwrap<MenuItemRecord>),
 
-  updateItem: (itemId: string, body: Partial<{ name: string; description: string | null; basePrice: number; taxRate: number; sku: string | null; calories: number | null; status: string; inventoryProductId: string | null }>) =>
+  updateItem: (itemId: string, body: Partial<{
+    name: string; description: string | null; basePrice: number; taxRate: number;
+    sku: string | null; calories: number | null; status: string; isFeatured: boolean;
+    isRecommended: boolean; hideOnline: boolean;
+    availableFromTime: string | null; availableToTime: string | null; availableDays: string | null;
+    dietaryType: 'veg' | 'non_veg' | null;
+    inventoryProductId: string | null;
+  }>) =>
     api.patch(`/items/${itemId}`, body).then(unwrap<MenuItemRecord>),
+
+  updateItemStatus: (itemId: string, status: string) =>
+    api.patch(`/items/${itemId}/status`, { status }).then(unwrap<MenuItemRecord>),
 
   deleteItem: (itemId: string) =>
     api.delete(`/items/${itemId}`).then((r) => r.data),
+
+  duplicateItem: (itemId: string) =>
+    api.post(`/items/${itemId}/duplicate`).then(unwrap<MenuItemRecord>),
+
+  hardDeleteItem: (itemId: string) =>
+    api.delete(`/items/${itemId}/hard`).then((r) => r.data),
+
+  reorderItems: (items: Array<{ id: string; sortOrder: number }>) =>
+    api.patch('/items/reorder', { items }).then((r) => r.data),
+
+  reorderCategories: (menuId: string, categories: Array<{ id: string; displayOrder: number }>) =>
+    api.post(`/menus/${menuId}/categories/reorder`, { categories }).then((r) => r.data),
+
+  duplicateCategory: (menuId: string, categoryId: string) =>
+    api.post(`/menus/${menuId}/categories/${categoryId}/duplicate`).then(
+      unwrap<{ category: MenuCategory; items: MenuItemRecord[] }>
+    ),
+
+  bulkUpdateItemStatus: (body: { ids: string[]; status: string }) =>
+    api.post('/items/bulk', body).then((r) => r.data),
 
   listIngredients: (itemId: string) =>
     api.get(`/items/${itemId}/ingredients`).then(unwrap<MenuItemIngredient[]>),
@@ -347,6 +444,115 @@ export const menuAPI = {
 
   removeIngredient: (itemId: string, ingredientId: string) =>
     api.delete(`/items/${itemId}/ingredients/${ingredientId}`).then((r) => r.data),
+
+  getItem: (itemId: string) =>
+    api.get(`/items/${itemId}`).then(unwrap<MenuItemDetailRecord>),
+
+  addVariant: (itemId: string, body: { name: string; price: number; sku?: string }) =>
+    api.post(`/items/${itemId}/variants`, body).then(unwrap<ItemVariantRecord>),
+
+  updateVariant: (itemId: string, variantId: string, body: Partial<{ name: string; price: number; sku: string; status: 'active' | 'inactive' }>) =>
+    api.patch(`/items/${itemId}/variants/${variantId}`, body).then(unwrap<ItemVariantRecord>),
+
+  removeVariant: (itemId: string, variantId: string) =>
+    api.delete(`/items/${itemId}/variants/${variantId}`).then((r) => r.data),
+
+  createModifierGroup: (itemId: string, body: {
+    storeId: string; name: string; selectionType?: 'single' | 'multiple';
+    minSelections?: number; maxSelections?: number; isRequired?: boolean;
+  }) =>
+    api.post(`/items/${itemId}/modifier-groups`, body).then(unwrap<ModifierGroupRecord>),
+
+  updateModifierGroup: (itemId: string, groupId: string, body: Partial<{
+    name: string; selectionType: 'single' | 'multiple'; minSelections: number; maxSelections: number; isRequired: boolean;
+  }>) =>
+    api.patch(`/items/${itemId}/modifier-groups/${groupId}`, body).then(unwrap<ModifierGroupRecord>),
+
+  deleteModifierGroup: (itemId: string, groupId: string) =>
+    api.delete(`/items/${itemId}/modifier-groups/${groupId}`).then((r) => r.data),
+
+  addModifier: (itemId: string, groupId: string, body: { name: string; nameAr?: string; priceAdjustment?: number; isDefault?: boolean }) =>
+    api.post(`/items/${itemId}/modifier-groups/${groupId}/modifiers`, body).then(unwrap<ModifierRecord>),
+
+  updateModifier: (itemId: string, groupId: string, modifierId: string, body: Partial<{
+    name: string; nameAr: string; priceAdjustment: number; isDefault: boolean; status: 'active' | 'inactive';
+  }>) =>
+    api.patch(`/items/${itemId}/modifier-groups/${groupId}/modifiers/${modifierId}`, body).then(unwrap<ModifierRecord>),
+
+  removeModifier: (itemId: string, groupId: string, modifierId: string) =>
+    api.delete(`/items/${itemId}/modifier-groups/${groupId}/modifiers/${modifierId}`).then((r) => r.data),
+
+  bulkImport: (body: {
+    storeId: string;
+    rows: Array<{
+      menuName: string;
+      categoryName: string;
+      itemName: string;
+      description?: string;
+      price: number;
+      taxRate?: number;
+      sku?: string;
+      status?: string;
+      dietaryType?: string;
+      variants?: string;
+      modifierGroups?: string;
+      ingredients?: string;
+    }>;
+  }) =>
+    api.post('/menus/bulk-import', body).then(
+      unwrap<{
+        created: { menus: number; categories: number; items: number; variants: number; modifierGroups: number; modifiers: number; ingredients: number };
+        skipped: number;
+        errors: Array<{ row: number; message: string }>;
+      }>
+    ),
+};
+
+// ─── Campaigns ────────────────────────────────────────────────────────────────
+
+import type {
+  Campaign,
+  CreateCampaignRequest,
+  UpdateCampaignRequest,
+  CampaignStats,
+  CampaignExecution,
+} from '@pos/shared-types';
+
+export const campaignAPI = {
+  list: (storeId: string, params?: {
+    status?: string;
+    campaignType?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) =>
+    api.get('/campaigns', { params: { storeId, ...params } })
+      .then(unwrap<{ data: Campaign[]; total: number; page: number; limit: number; totalPages: number }>),
+
+  get: (id: string) =>
+    api.get(`/campaigns/${id}`).then(unwrap<Campaign>),
+
+  create: (body: CreateCampaignRequest) =>
+    api.post('/campaigns', body).then(unwrap<Campaign>),
+
+  update: (id: string, body: UpdateCampaignRequest) =>
+    api.patch(`/campaigns/${id}`, body).then(unwrap<Campaign>),
+
+  delete: (id: string) =>
+    api.delete(`/campaigns/${id}`).then((r) => r.data),
+
+  duplicate: (id: string) =>
+    api.post(`/campaigns/${id}/duplicate`).then(unwrap<Campaign>),
+
+  bulkUpdateStatus: (ids: string[], status: string) =>
+    api.patch('/campaigns/bulk', { ids, status }).then((r) => r.data),
+
+  getStats: (id: string) =>
+    api.get(`/campaigns/${id}/stats`).then(unwrap<CampaignStats>),
+
+  getExecutions: (id: string, params?: { page?: number; limit?: number }) =>
+    api.get(`/campaigns/${id}/executions`, { params })
+      .then(unwrap<{ data: CampaignExecution[]; total: number; page: number }>),
 };
 
 // ─── Users ────────────────────────────────────────────────────────────────────

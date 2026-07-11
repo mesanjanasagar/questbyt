@@ -6,6 +6,7 @@ import {
   ValidationError,
   buildPaginatedResponse,
   parsePagination,
+  convertToStockUnit,
 } from '@pos/shared-utils';
 import type {
   Product,
@@ -24,7 +25,7 @@ import { InventoryUnitType, StockMovementType } from '@pos/shared-types';
 
 export async function createProduct(req: {
   storeId: string;
-  sku: string;
+  sku?: string;
   name: string;
   description?: string;
   categoryId?: string;
@@ -32,10 +33,13 @@ export async function createProduct(req: {
 }): Promise<Product> {
   const id = generateId();
   const result = await db.query(
+    // sku must be NULL (not '') when absent — the table has UNIQUE(store_id, sku)
+    // and Postgres treats multiple NULLs as non-conflicting but multiple ''
+    // as a real duplicate, so a second SKU-less product would otherwise fail.
     `INSERT INTO products (id, store_id, sku, name, description, category_id, unit_type)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING *`,
-    [id, req.storeId, req.sku, req.name, req.description ?? null, req.categoryId ?? null, req.unitType],
+    [id, req.storeId, req.sku || null, req.name, req.description ?? null, req.categoryId ?? null, req.unitType],
   );
 
   const product = rowToProduct(result.rows[0]);
@@ -375,6 +379,91 @@ export async function setInitialStock(
 }
 
 // ================================================
+// Bulk import products (Excel/CSV) — mirrors the menu service's bulk
+// import: create-or-skip per row, one row's failure doesn't abort the rest.
+// ================================================
+
+export interface BulkImportProductRow {
+  name: string;
+  sku?: string;
+  description?: string;
+  unitType?: string;
+  currentStock?: number;
+  reorderLevel?: number;
+  reorderQuantity?: number;
+}
+
+export interface BulkImportProductResult {
+  created: number;
+  skipped: number;
+  errors: Array<{ row: number; message: string }>;
+}
+
+const VALID_UNIT_TYPES = new Set(['piece', 'kg', 'liter', 'box']);
+
+export async function bulkImportProducts(
+  storeId: string,
+  rows: BulkImportProductRow[],
+  userId: string,
+): Promise<BulkImportProductResult> {
+  const result: BulkImportProductResult = { created: 0, skipped: 0, errors: [] };
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowNum = i + 2; // 1-indexed + header offset
+
+    try {
+      if (!row.name?.trim()) {
+        result.errors.push({ row: rowNum, message: 'name is required' });
+        continue;
+      }
+      const unitType = row.unitType?.trim().toLowerCase() || 'piece';
+      if (!VALID_UNIT_TYPES.has(unitType)) {
+        result.errors.push({ row: rowNum, message: `unit_type "${row.unitType}" must be one of piece, kg, liter, box` });
+        continue;
+      }
+
+      // Skip (not error) on an existing SKU or exact name match within the
+      // store — same "don't duplicate on re-import" behavior as menu items.
+      const trimmedSku = row.sku?.trim() || null;
+      const existing = await db.query(
+        `SELECT id FROM products WHERE store_id = $1 AND (LOWER(name) = $2 OR ($3::text IS NOT NULL AND sku = $3)) LIMIT 1`,
+        [storeId, row.name.trim().toLowerCase(), trimmedSku],
+      );
+      if (existing.rowCount && existing.rowCount > 0) {
+        result.skipped++;
+        continue;
+      }
+
+      const product = await createProduct({
+        storeId,
+        name: row.name.trim(),
+        sku: row.sku?.trim() || undefined,
+        description: row.description?.trim() || undefined,
+        unitType: unitType as InventoryUnitType,
+      });
+      result.created++;
+
+      if (row.currentStock !== undefined || row.reorderLevel !== undefined || row.reorderQuantity !== undefined) {
+        try {
+          await setInitialStock(
+            product.id,
+            { currentStock: row.currentStock ?? 0, reorderLevel: row.reorderLevel, reorderQuantity: row.reorderQuantity },
+            userId,
+          );
+        } catch (err: any) {
+          result.errors.push({ row: rowNum, message: `Product created but stock failed: ${err?.message ?? 'unknown error'}` });
+        }
+      }
+    } catch (err: any) {
+      result.errors.push({ row: rowNum, message: err?.message ?? 'Unknown error' });
+    }
+  }
+
+  return result;
+}
+
+// ================================================
 // Update product details
 // ================================================
 
@@ -412,16 +501,28 @@ export async function archiveProduct(productId: string): Promise<void> {
 export async function reserveStockForOrder(
   orderId: string,
   storeId: string,
-  items: Array<{ productId: string; quantity: number }>,
+  items: Array<{ productId: string; quantity: number; unitType?: string }>,
 ): Promise<void> {
   const client = await db.connect();
   try {
     await client.query('BEGIN');
     for (const item of items) {
-      const inv = await client.query(`SELECT * FROM inventory WHERE product_id = $1 FOR UPDATE`, [item.productId]);
+      // Join products for its stocking unit — the caller's quantity is in
+      // the recipe's unit (e.g. "200" meaning 200g), which has to be
+      // converted into whatever unit this product is actually counted in
+      // (kg/liter/piece/box) before it means anything against current_stock.
+      const inv = await client.query(
+        `SELECT i.*, p.unit_type AS product_unit_type FROM inventory i
+         JOIN products p ON p.id = i.product_id
+         WHERE i.product_id = $1 FOR UPDATE`,
+        [item.productId],
+      );
       if (!inv.rowCount || inv.rowCount === 0) continue;
+      const requestedQty = item.unitType
+        ? convertToStockUnit(item.quantity, item.unitType, inv.rows[0].product_unit_type)
+        : item.quantity;
       const available = parseFloat(inv.rows[0].current_stock) - parseFloat(inv.rows[0].reserved_stock);
-      const toReserve = Math.min(item.quantity, Math.max(0, available));
+      const toReserve = Math.min(requestedQty, Math.max(0, available));
       if (toReserve <= 0) continue;
       await client.query(
         `UPDATE inventory SET reserved_stock = reserved_stock + $2, updated_at = NOW() WHERE product_id = $1`,

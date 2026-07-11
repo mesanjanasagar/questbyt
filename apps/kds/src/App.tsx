@@ -1,13 +1,11 @@
-import React from 'react';
+import { useKDSAuthStore } from './store/authStore';
 import { KDSPage } from './pages/KDSPage';
+import { LoginPage } from './pages/LoginPage';
 import './App.css';
 
 function App() {
-  return (
-    <div className="App">
-      <KDSPage />
-    </div>
-  );
+  const token = useKDSAuthStore((s) => s.token);
+  return token ? <KDSPage /> : <LoginPage />;
 }
 
 export default App;

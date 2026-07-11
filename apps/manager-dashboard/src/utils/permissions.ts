@@ -8,7 +8,8 @@ export type Permission =
   | 'inventory:view' | 'inventory:create' | 'inventory:edit' | 'inventory:manage'
   | 'menus:view' | 'menus:create' | 'menus:edit' | 'menus:delete'
   | 'reports:view'
-  | 'access_control:view' | 'access_control:manage';
+  | 'access_control:view' | 'access_control:manage'
+  | 'promo:manage';
 
 const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   admin: [
@@ -22,6 +23,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     'menus:view', 'menus:create', 'menus:edit', 'menus:delete',
     'reports:view',
     'access_control:view', 'access_control:manage',
+    'promo:manage',
   ],
   manager: [
     'restaurants:view', 'restaurants:edit',
@@ -34,6 +36,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     'menus:view', 'menus:create', 'menus:edit', 'menus:delete',
     'reports:view',
     'access_control:view',
+    'promo:manage',
   ],
   cashier: ['orders:view', 'orders:manage', 'menus:view', 'tables:view', 'inventory:view'],
   kitchen: ['orders:view', 'orders:manage', 'menus:view', 'inventory:view'],

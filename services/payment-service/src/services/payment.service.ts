@@ -8,7 +8,7 @@ import type { Payment, Refund, ProcessPaymentRequest, RefundRequest } from '@pos
 // ───────────────────────────────────────────
 
 export async function processPayment(
-  req: ProcessPaymentRequest & { storeId: string },
+  req: ProcessPaymentRequest & { storeId: string; deviceId?: string; cashierId?: string },
 ): Promise<Payment> {
   // Idempotency check – prevent double-charging
   const existing = await db.query(
@@ -40,8 +40,8 @@ export async function processPayment(
   const result = await db.query(
     `INSERT INTO payments
       (id, order_id, store_id, amount, payment_method, transaction_id, status,
-       idempotency_key, cash_tendered, change_due, metadata, processed_at)
-     VALUES ($1,$2,$3,$4,$5,$6,'success',$7,$8,$9,$10,NOW())
+       idempotency_key, cash_tendered, change_due, metadata, processed_at, device_id, cashier_id)
+     VALUES ($1,$2,$3,$4,$5,$6,'success',$7,$8,$9,$10,NOW(),$11,$12)
      RETURNING *`,
     [
       generateId(),
@@ -54,17 +54,54 @@ export async function processPayment(
       req.cashTendered ?? null,
       changeDue || null,
       req.receiptDetails ? JSON.stringify(req.receiptDetails) : null,
+      req.deviceId ?? null,
+      req.cashierId ?? null,
     ],
   );
 
   const payment = rowToPayment(result.rows[0]);
 
-  // Notify order-service to mark order as paid (best-effort)
-  notifyOrderPaid(req.orderId, payment.id, req.paymentMethod).catch((err) =>
-    console.warn('Failed to notify order-service of payment:', err.message),
+  // Bill-split support: a single order can be covered by several
+  // successful payments (one per share). Only mark the order paid — and
+  // fire the payment.processed event downstream — once their sum actually
+  // covers the order's real total, not on the first partial payment.
+  const orderTotal = await fetchOrderTotal(req.orderId);
+  const paidResult = await db.query(
+    `SELECT COALESCE(SUM(amount), 0) AS total FROM payments WHERE order_id = $1 AND status = 'success'`,
+    [req.orderId],
   );
+  const totalPaid = parseFloat(paidResult.rows[0].total);
+  const remainingBalance = orderTotal != null ? Math.max(0, parseFloat((orderTotal - totalPaid).toFixed(2))) : 0;
+  const isFullyPaid = orderTotal == null || remainingBalance <= 0.01;
 
-  return payment;
+  if (isFullyPaid) {
+    // Notify order-service to mark order as paid (best-effort)
+    notifyOrderPaid(req.orderId, payment.id, req.paymentMethod).catch((err) =>
+      console.warn('Failed to notify order-service of payment:', err.message),
+    );
+  }
+
+  return { ...payment, remainingBalance, isFullyPaid };
+}
+
+// ───────────────────────────────────────────
+// Fetch an order's real total (for split-payment coverage checks)
+// Returns null if the order can't be found — callers treat that as
+// "can't verify, assume this payment covers it" rather than blocking checkout.
+// ───────────────────────────────────────────
+
+async function fetchOrderTotal(orderId: string): Promise<number | null> {
+  try {
+    const res = await fetch(`${config.ORDER_SERVICE_URL}/orders/${orderId}`, {
+      headers: { 'X-Internal-Service': 'payment-service' },
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { data?: { totalAmount?: number } };
+    return json.data?.totalAmount ?? null;
+  } catch (err) {
+    console.warn(`payment-service: could not fetch order ${orderId} total:`, (err as Error).message);
+    return null;
+  }
 }
 
 // ───────────────────────────────────────────
@@ -88,6 +125,37 @@ export async function getPaymentByOrderId(orderId: string): Promise<Payment | nu
   );
   if (!result.rowCount || result.rowCount === 0) return null;
   return rowToPayment(result.rows[0]);
+}
+
+// ───────────────────────────────────────────
+// Payment summary for an order — used by the split-bill flow to show
+// how many shares have been collected and what's still owed.
+// ───────────────────────────────────────────
+
+export interface PaymentSummary {
+  orderTotal: number | null;
+  totalPaid: number;
+  remainingBalance: number;
+  isFullyPaid: boolean;
+  payments: Payment[];
+}
+
+export async function getPaymentSummaryForOrder(orderId: string): Promise<PaymentSummary> {
+  const result = await db.query(
+    `SELECT * FROM payments WHERE order_id = $1 AND status = 'success' ORDER BY created_at ASC`,
+    [orderId],
+  );
+  const payments = result.rows.map(rowToPayment);
+  const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+  const orderTotal = await fetchOrderTotal(orderId);
+  const remainingBalance = orderTotal != null ? Math.max(0, parseFloat((orderTotal - totalPaid).toFixed(2))) : 0;
+  return {
+    orderTotal,
+    totalPaid: parseFloat(totalPaid.toFixed(2)),
+    remainingBalance,
+    isFullyPaid: orderTotal != null && remainingBalance <= 0.01,
+    payments,
+  };
 }
 
 // ───────────────────────────────────────────
@@ -142,7 +210,7 @@ async function notifyOrderPaid(
   paymentId: string,
   paymentMethod: string,
 ): Promise<void> {
-  const url = `${config.ORDER_SERVICE_URL}/api/v1/orders/${orderId}/payment`;
+  const url = `${config.ORDER_SERVICE_URL}/orders/${orderId}/payment`;
   const res = await fetch(url, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', 'X-Internal-Service': 'payment-service' },

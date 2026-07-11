@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   PageHeader, Card, CardBody, StatusBadge, Badge, Table, EmptyState,
   ReceiptIcon,
@@ -6,6 +6,7 @@ import {
 import type { Column } from '@pos/ui';
 import api from '../api/client';
 import { useDashboardStore } from '../store/dashboardStore';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Order {
   id: string;
@@ -17,7 +18,19 @@ interface Order {
   createdAt: string;
 }
 
-const STATUS_FILTERS = ['all', 'pending', 'in-progress', 'ready', 'delivered', 'cancelled'];
+interface OrderStats {
+  total: number;
+  pending: number;
+  cooking: number;
+  ready: number;
+  completed: number;
+  cancelled: number;
+}
+
+const STATUS_FILTERS = ['all', 'pending', 'cooking', 'ready', 'completed', 'cancelled'] as const;
+type StatusFilter = typeof STATUS_FILTERS[number];
+
+const POLL_INTERVAL = 10_000;
 
 const columns: Column<Order>[] = [
   {
@@ -66,37 +79,86 @@ const columns: Column<Order>[] = [
 
 export const OrdersPage: React.FC = () => {
   const { selectedStoreId } = useDashboardStore();
+  const { user } = useAuth();
+  const effectiveStoreId = selectedStoreId || user?.storeId || '';
+
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+
+  // ── A: Global order statistics ─────────────────────────────────────────────
+  // Fetched independently of the active filter. Drives badge counts only.
+  const [stats, setStats] = useState<OrderStats>({
+    total: 0, pending: 0, cooking: 0, ready: 0, completed: 0, cancelled: 0,
+  });
+  const statsTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchStats = useCallback(async () => {
+    if (!effectiveStoreId) return;
+    try {
+      const res = await api.get('/orders/stats', { params: { storeId: effectiveStoreId } });
+      const data = (res.data as any)?.data;
+      if (data) setStats(data as OrderStats);
+    } catch {
+      // non-fatal — leave previous counts in place
+    }
+  }, [effectiveStoreId]);
+
+  useEffect(() => {
+    if (!effectiveStoreId) return;
+    fetchStats();
+    statsTimerRef.current = setInterval(fetchStats, POLL_INTERVAL);
+    return () => {
+      if (statsTimerRef.current) clearInterval(statsTimerRef.current);
+    };
+  }, [fetchStats]);
+
+  // ── B: Filtered order list ─────────────────────────────────────────────────
+  // Re-fetches when statusFilter changes. Drives table rows only.
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('all');
+  const ordersTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const load = useCallback(async () => {
+  const fetchOrders = useCallback(async () => {
+    if (!effectiveStoreId) {
+      setLoading(false);
+      return;
+    }
     try {
       const res = await api.get('/orders', {
         params: {
-          storeId: selectedStoreId || undefined,
+          storeId: effectiveStoreId,
           status: statusFilter !== 'all' ? statusFilter : undefined,
           limit: 100,
         },
       });
-      setOrders((res.data as { data: Order[] }).data ?? []);
+      const payload = (res.data as any)?.data;
+      setOrders(
+        Array.isArray(payload?.data) ? payload.data
+          : Array.isArray(payload) ? payload
+          : [],
+      );
     } catch (err) {
       console.error('Failed to load orders:', err);
     } finally {
       setLoading(false);
     }
-  }, [selectedStoreId, statusFilter]);
+  }, [effectiveStoreId, statusFilter]);
 
   useEffect(() => {
-    load();
-    const interval = setInterval(load, 10000);
-    return () => clearInterval(interval);
-  }, [load]);
+    setLoading(true);
+    fetchOrders();
+    if (ordersTimerRef.current) clearInterval(ordersTimerRef.current);
+    ordersTimerRef.current = setInterval(fetchOrders, POLL_INTERVAL);
+    return () => {
+      if (ordersTimerRef.current) clearInterval(ordersTimerRef.current);
+    };
+  }, [fetchOrders]);
 
-  const counts = orders.reduce((acc, o) => {
-    acc[o.status] = (acc[o.status] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  // ── Badge label helper ─────────────────────────────────────────────────────
+
+  function badgeLabel(s: StatusFilter): string {
+    if (s === 'all') return `All (${stats.total})`;
+    return `${s.charAt(0).toUpperCase() + s.slice(1)} (${stats[s] ?? 0})`;
+  }
 
   return (
     <div className="p-6 space-y-5">
@@ -105,14 +167,14 @@ export const OrdersPage: React.FC = () => {
         description="Real-time order feed — refreshes every 10 seconds"
         actions={
           <div className="flex items-center gap-2">
-            <Badge variant="info">{counts['in-progress'] ?? 0} In Progress</Badge>
-            <Badge variant="success">{counts['ready'] ?? 0} Ready</Badge>
-            <Badge variant="default">{counts['pending'] ?? 0} Pending</Badge>
+            <Badge variant="info">{stats.cooking} Cooking</Badge>
+            <Badge variant="success">{stats.ready} Ready</Badge>
+            <Badge variant="default">{stats.pending} Pending</Badge>
           </div>
         }
       />
 
-      {/* Status filter tabs */}
+      {/* Status filter tabs — counts come from stats, never from filtered rows */}
       <div className="flex gap-1.5 flex-wrap">
         {STATUS_FILTERS.map((s) => (
           <button
@@ -124,7 +186,7 @@ export const OrdersPage: React.FC = () => {
                 : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'
             }`}
           >
-            {s === 'all' ? `All (${orders.length})` : `${s} (${counts[s] ?? 0})`}
+            {badgeLabel(s)}
           </button>
         ))}
       </div>

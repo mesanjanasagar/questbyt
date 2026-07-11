@@ -63,6 +63,23 @@ function EditPanel({ store, canEdit, onSaved, onDeleted }: EditPanelProps) {
     logoUrl: store.branding?.logoUrl ?? '',
     displayName: store.branding?.displayName ?? '',
   });
+  const [captureCustomerDetails, setCaptureCustomerDetails] = useState(store.posCaptureCustomerDetails);
+  const [posSettingBusy, setPosSettingBusy] = useState(false);
+
+  const toggleCaptureCustomerDetails = async () => {
+    const next = !captureCustomerDetails;
+    setPosSettingBusy(true);
+    try {
+      const updated = await restaurantAPI.update(store.id, { posCaptureCustomerDetails: next });
+      setCaptureCustomerDetails(next);
+      onSaved(updated);
+      success(next ? 'Customer capture enabled on POS' : 'Customer capture disabled on POS');
+    } catch {
+      toastError('Failed to update POS setting');
+    } finally {
+      setPosSettingBusy(false);
+    }
+  };
 
   const save = async (section: SaveSection, payload: Record<string, unknown>) => {
     setSaving(section);
@@ -258,6 +275,38 @@ function EditPanel({ store, canEdit, onSaved, onDeleted }: EditPanelProps) {
         </CardBody>
       </Card>
 
+      {/* POS Settings */}
+      <Card>
+        <CardHeader><CardTitle>POS Settings</CardTitle></CardHeader>
+        <CardBody>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-neutral-800">Capture customer details on POS</p>
+              <p className="text-xs text-neutral-500 mt-0.5">
+                When on, cashiers can attach a name/mobile/email to an order and look up a customer's
+                order history from the POS cart. When off, the customer icon is hidden and orders stay anonymous.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={captureCustomerDetails}
+              disabled={!canEdit || posSettingBusy}
+              onClick={toggleCaptureCustomerDetails}
+              className={`relative flex-shrink-0 w-11 h-6 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                captureCustomerDetails ? 'bg-primary-600' : 'bg-neutral-300'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                  captureCustomerDetails ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        </CardBody>
+      </Card>
+
       {/* Danger Zone */}
       {canEdit && (
         <Card className="border-red-200">
@@ -380,8 +429,8 @@ export const RestaurantPage: React.FC = () => {
         title="Restaurants"
         description="View and manage all restaurant profiles"
         actions={isAdmin ? (
-          <Button variant="primary" size="sm" onClick={() => { setForm(EMPTY_CREATE); setCreateModal(true); }}>
-            <PlusIcon size={16} className="mr-1.5" /> Add Restaurant
+          <Button variant="primary" size="sm" icon={<PlusIcon size={16} />} onClick={() => { setForm(EMPTY_CREATE); setCreateModal(true); }}>
+            Add Restaurant
           </Button>
         ) : undefined}
       />

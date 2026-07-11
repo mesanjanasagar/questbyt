@@ -147,6 +147,7 @@ const UpdateProfileSchema = z.object({
   timezone: z.string().max(100).optional(),
   address: AddressSchema.optional(),
   operatingHours: z.array(OperatingHoursSchema).optional(),
+  posCaptureCustomerDetails: z.boolean().optional(),
 });
 
 router.patch('/:storeId', requireAdmin, async (req, res, next) => {

@@ -10,6 +10,8 @@ import {
 
 export interface Order {
   id: string;
+  orderNumber?: number;
+  itemCount?: number;
   storeId: string;
   deviceId: string;
   cashierId: string;
@@ -22,6 +24,9 @@ export interface Order {
   paymentMethod?: PaymentMethod;
   orderType: OrderType;
   tableNumber?: number;
+  tableId?: string;
+  branchId?: string;
+  guestCount?: number;
   notes?: string;
   platform: Platform;
   platformOrderId?: string;
@@ -40,12 +45,14 @@ export interface OrderItem {
   id: string;
   orderId: string;
   menuItemId: string;
+  itemName?: string;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
   modifications?: OrderItemModification[];
   notes?: string;
   status: OrderItemStatus;
+  kdsDispatchedAt?: string;
   createdAt: string;
 }
 
@@ -72,6 +79,9 @@ export interface CreateOrderRequest {
   customerId?: string;
   orderType: OrderType;
   tableNumber?: number;
+  tableId?: string;
+  branchId?: string;
+  guestCount?: number;
   notes?: string;
   platform?: Platform;
   items: CreateOrderItemRequest[];
@@ -79,11 +89,20 @@ export interface CreateOrderRequest {
 
 export interface CreateOrderItemRequest {
   menuItemId: string;
+  itemName?: string;
   variantId?: string;
   quantity: number;
   unitPrice: number;
   modifications?: OrderItemModification[];
   notes?: string;
+}
+
+export interface SendToKitchenRequest {
+  items: CreateOrderItemRequest[];
+}
+
+export interface UpdateOrderItemStatusRequest {
+  status: OrderItemStatus;
 }
 
 export interface UpdateOrderStatusRequest {
@@ -106,6 +125,8 @@ export interface CancelOrderRequest {
 
 export interface OrderListQuery {
   storeId: string;
+  branchId?: string;
+  customerId?: string;
   status?: OrderStatus;
   from?: string;
   to?: string;

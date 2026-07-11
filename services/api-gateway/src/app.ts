@@ -1,4 +1,5 @@
 import express, { Express } from 'express';
+import http from 'http';
 import helmet from 'helmet';
 import cors from 'cors';
 import morgan from 'morgan';
@@ -67,6 +68,59 @@ app.use('/api/v1/auth', optionalAuthenticate, (req: any, res, next) => {
   proxy(config.AUTH_SERVICE_URL, {
     proxyReqPathResolver: (req: any) => '/auth' + req.path,
   })(req, res, next);
+});
+
+// Public kiosk catalog — read-only menu browsing (no auth required)
+app.get('/api/v1/menus/full', (req: any, res, next) => {
+  injectCorrelationId(req);
+  const qs = req.originalUrl.split('?')[1];
+  proxy(config.MENU_SERVICE_URL, {
+    proxyReqPathResolver: () => `/menus/full${qs ? '?' + qs : ''}`,
+  })(req, res, next);
+});
+
+// Kiosk order creation (public — no auth required, kiosk terminals are public-facing)
+app.use('/api/v1/orders/kiosk', (req: any, res, next) => {
+  if (req.method !== 'POST') { next(); return; }
+  injectCorrelationId(req);
+  proxy(config.ORDER_SERVICE_URL, {
+    proxyReqPathResolver: () => '/orders/kiosk',
+  })(req, res, next);
+});
+
+// SSE real-time events — must be before the generic /api/v1 proxy
+// express-http-proxy buffers responses and breaks streaming; use raw http.request instead.
+app.get('/api/v1/orders/events', authenticate, (req: any, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  const qs = req.originalUrl.includes('?') ? req.originalUrl.split('?')[1] : '';
+  const orderServiceUrl = new URL(config.ORDER_SERVICE_URL);
+  const proxyReq = http.request({
+    hostname: orderServiceUrl.hostname,
+    port: parseInt(orderServiceUrl.port || '80', 10),
+    path: `/orders/events${qs ? '?' + qs : ''}`,
+    method: 'GET',
+    headers: {
+      'x-user-id': req.user?.sub ?? '',
+      'x-store-id': req.user?.storeId ?? '',
+      Accept: 'text/event-stream',
+    },
+  }, (proxyRes) => {
+    proxyRes.pipe(res, { end: true });
+    proxyRes.on('error', () => { try { res.end(); } catch { /* ignore */ } });
+  });
+
+  proxyReq.on('error', (err) => {
+    console.error('[gateway] SSE proxy error:', err.message);
+    try { res.end(); } catch { /* ignore */ }
+  });
+
+  req.on('close', () => proxyReq.destroy());
+  proxyReq.end();
 });
 
 // All other routes (authenticated)

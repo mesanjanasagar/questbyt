@@ -27,6 +27,7 @@ export const SERVICE_ROUTES: ServiceRoute[] = [
 
   // Payments
   { path: '/api/v1/payments', target: config.PAYMENT_SERVICE_URL },
+  { path: '/api/v1/shifts', target: config.PAYMENT_SERVICE_URL },
 
   // Customers
   { path: '/api/v1/customers', target: config.CUSTOMER_SERVICE_URL },

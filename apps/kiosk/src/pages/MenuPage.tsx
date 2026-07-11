@@ -3,9 +3,6 @@ import { useKioskStore } from '../store/kioskStore';
 import { kioskAPI } from '../api/kiosk';
 import { MenuItem, ModifierGroup } from '../types';
 
-const STORE_ID = localStorage.getItem('storeId') || 'default-store';
-const MENU_ID = localStorage.getItem('menuId') || 'default-menu';
-
 const ItemModal: React.FC<{ item: MenuItem; onClose: () => void }> = ({ item, onClose }) => {
   const { addToCart } = useKioskStore();
   const [quantity, setQuantity] = useState(1);
@@ -132,16 +129,14 @@ export const MenuPage: React.FC = () => {
   } = useKioskStore();
 
   useEffect(() => {
-    kioskAPI.getCategories(MENU_ID).then((cats) => {
+    const storeId = localStorage.getItem('storeId') || '';
+    if (!storeId) return;
+    kioskAPI.getCatalog(storeId).then(({ categories: cats, items }) => {
       setCategories(cats);
+      setMenuItems(items);
       if (cats.length > 0) setSelectedCategory(cats[0].id);
     }).catch(console.error);
   }, []);
-
-  useEffect(() => {
-    if (!selectedCategory) return;
-    kioskAPI.getMenuItems(MENU_ID, selectedCategory).then(setMenuItems).catch(console.error);
-  }, [selectedCategory]);
 
   const count = cartCount();
   const total = cartTotal();
@@ -185,7 +180,7 @@ export const MenuPage: React.FC = () => {
       {/* Menu Items grid */}
       <div className="flex-1 overflow-y-auto p-4">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {menuItems.filter((i) => i.available).map((item) => (
+          {menuItems.filter((i) => i.available && i.category === selectedCategory).map((item) => (
             <button
               key={item.id}
               onClick={() => setSelectedItem(item)}

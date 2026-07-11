@@ -4,6 +4,7 @@ import cors from 'cors';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import paymentRoutes from './routes/payment.routes';
+import shiftRoutes from './routes/shift.routes';
 import { errorHandler } from './middleware/errorHandler';
 
 export const app: Express = express();
@@ -33,7 +34,8 @@ app.use(
   }),
 );
 
-app.use('/api/v1/payments', paymentRoutes);
+app.use('/payments', paymentRoutes);
+app.use('/shifts', shiftRoutes);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'payment-service', timestamp: new Date().toISOString() });

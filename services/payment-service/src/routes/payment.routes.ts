@@ -27,8 +27,26 @@ router.post('/process', async (req, res, next) => {
       }),
       req.body,
     );
-    const payment = await paymentService.processPayment(body);
+    const payment = await paymentService.processPayment({
+      ...body,
+      deviceId: req.user?.deviceId,
+      cashierId: req.user?.sub,
+    });
     res.status(201).json(successResponse(payment, 'Payment processed successfully'));
+  } catch (err) {
+    next(err);
+  }
+});
+
+// GET /api/v1/payments/order/:orderId/summary — used by the split-bill flow
+router.get('/order/:orderId/summary', async (req, res, next) => {
+  try {
+    const { orderId } = validateOrThrow(
+      z.object({ orderId: z.string().uuid() }),
+      req.params,
+    );
+    const summary = await paymentService.getPaymentSummaryForOrder(orderId);
+    res.json(successResponse(summary));
   } catch (err) {
     next(err);
   }

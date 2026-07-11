@@ -118,12 +118,33 @@ const MOCK_ITEMS: MenuItem[] = [
   },
 ];
 
-let mockOrderCounter = 42;
-
-const isMockMode = () => import.meta.env.VITE_USE_MOCK === 'true';
-
 // — API ————————————————————————————————————————————
 export const kioskAPI = {
+  // Loads the full menu catalog (categories + items) for a store without auth.
+  getCatalog: async (storeId: string): Promise<{ categories: Category[]; items: MenuItem[] }> => {
+    const res = await api.get('/menus/full', { params: { storeId } });
+    const raw = (res.data?.data ?? {}) as { categories?: any[]; items?: any[] };
+
+    const categories: Category[] = (raw.categories ?? [])
+      .filter((c: any) => c.status === 'active')
+      .map((c: any) => ({ id: c.id, name: c.name, sortOrder: c.displayOrder ?? 0 }));
+
+    const items: MenuItem[] = (raw.items ?? [])
+      .filter((i: any) => i.status === 'active')
+      .map((i: any) => ({
+        id: i.id,
+        name: i.name,
+        description: i.description ?? null,
+        price: i.basePrice,
+        imageUrl: i.imageUrl ?? null,
+        category: i.categoryId,
+        available: true,
+        modifierGroups: [],
+      }));
+
+    return { categories, items };
+  },
+
   getCategories: async (_menuId: string): Promise<Category[]> => {
     try {
       const res = await api.get<{ data: Category[] }>(`/menus/${_menuId}/categories`);
@@ -149,21 +170,18 @@ export const kioskAPI = {
 
   createOrder: async (
     storeId: string,
-    items: { menuItemId: string; quantity: number; modifiers: string[] }[],
-    orderType: string = 'kiosk'
+    items: { menuItemId: string; quantity: number; unitPrice: number; modifiers: string[] }[],
   ): Promise<{ id: string; orderNumber: number }> => {
-    try {
-      const res = await api.post<{ data: { id: string; orderNumber: number } }>('/orders', {
-        storeId,
-        orderType,
-        items,
-      });
-      return res.data.data;
-    } catch {
-      // Mock: simulate a successful order creation
-      mockOrderCounter += 1;
-      return { id: `mock-order-${mockOrderCounter}`, orderNumber: mockOrderCounter };
-    }
+    const res = await api.post<{ data: { id: string; orderNumber: number } }>('/orders/kiosk', {
+      storeId,
+      items: items.map(({ menuItemId, quantity, unitPrice, modifiers }) => ({
+        menuItemId,
+        quantity,
+        unitPrice,
+        modifierIds: modifiers,
+      })),
+    });
+    return res.data.data;
   },
 
   processPayment: async (
@@ -174,8 +192,7 @@ export const kioskAPI = {
     try {
       await api.post('/payments', { orderId, paymentMethod: method, amount });
     } catch {
-      // Mock: simulate payment processing delay
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Payment service is optional — kiosk order is already persisted
     }
   },
 };

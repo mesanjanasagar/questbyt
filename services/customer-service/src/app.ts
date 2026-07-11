@@ -32,7 +32,12 @@ app.use(
   }),
 );
 
-app.use('/api/v1/customers', customerRoutes);
+// The gateway mounts this whole service at '/api/v1/customers' and strips
+// that prefix before proxying — every other service (order, inventory,
+// store...) mounts its routes at the bare resource path for the same
+// reason. This used to mount at '/api/v1/customers' too, which meant every
+// request arriving from the gateway 404'd before reaching a route handler.
+app.use('/customers', customerRoutes);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'customer-service', timestamp: new Date().toISOString() });

@@ -89,13 +89,35 @@ const MOCK_CAMPAIGNS: CampaignROI[] = [
 // — API ————————————————————————————————————————————————
 export const dashboardAPI = {
   getStoreMetrics: async (storeId?: string): Promise<StoreMetrics[]> => {
+    if (storeId) {
+      try {
+        const [today, profile] = await Promise.all([
+          api.get<{ data: {
+            ordersToday: number; revenueToday: number; avgOrderValue: number;
+            customerCount: number; ordersInProgress: number; ordersCompleted: number; ordersCancelled: number;
+          } }>('/orders/stats/today', { params: { storeId } }),
+          api.get<{ data: { name: string } }>(`/stores/${storeId}`).catch(() => null),
+        ]);
+        const d = today.data.data;
+        return [{
+          storeId,
+          storeName: profile?.data?.data?.name ?? 'Your Store',
+          ordersToday: d.ordersToday,
+          revenueToday: d.revenueToday,
+          avgOrderValue: d.avgOrderValue,
+          customerCount: d.customerCount,
+          ordersInProgress: d.ordersInProgress,
+          ordersCompleted: d.ordersCompleted,
+          ordersCancelled: d.ordersCancelled,
+        }];
+      } catch {
+        return MOCK_STORES.filter((s) => s.storeId === storeId);
+      }
+    }
     try {
-      const res = await api.get<{ data: StoreMetrics[] }>('/reports/store-metrics', {
-        params: storeId ? { storeId } : undefined,
-      });
+      const res = await api.get<{ data: StoreMetrics[] }>('/reports/store-metrics');
       return res.data.data;
     } catch {
-      if (storeId) return MOCK_STORES.filter((s) => s.storeId === storeId);
       return MOCK_STORES;
     }
   },

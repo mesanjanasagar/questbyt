@@ -9,6 +9,7 @@ const configSchema = z.object({
   JWT_SECRET: z.string().min(32),
   MENU_SERVICE_URL: z.string().default('http://localhost:3005'),
   INVENTORY_SERVICE_URL: z.string().default('http://localhost:3002'),
+  STORE_SERVICE_URL: z.string().default('http://localhost:3011'),
   INTERNAL_SERVICE_SECRET: z.string().default('internal-secret-change-in-prod'),
 });
 

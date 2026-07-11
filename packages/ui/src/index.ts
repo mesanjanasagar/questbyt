@@ -9,6 +9,8 @@ export * from './icons';
 // Components
 export { Button } from './components/Button';
 export { Badge, StatusBadge } from './components/Badge';
+export { DietaryMark } from './components/DietaryMark';
+export type { DietaryType as DietaryMarkType } from './components/DietaryMark';
 export {
   Card,
   CardHeader,

@@ -32,7 +32,7 @@ app.use(
   }),
 );
 
-app.use('/api/v1/campaigns', campaignRoutes);
+app.use('/campaigns', campaignRoutes);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'marketing-service', timestamp: new Date().toISOString() });

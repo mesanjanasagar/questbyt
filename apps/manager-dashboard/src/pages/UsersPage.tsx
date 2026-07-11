@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import {
   PageHeader, Card, CardBody, Button, Input, Badge, Modal,
   Table, EmptyState, Spinner, useToast,
-  UserCheckIcon, PlusIcon, KeyIcon, ShieldIcon,
+  UserCheckIcon, PlusIcon, KeyIcon, ShieldIcon, EyeIcon, EyeOffIcon,
 } from '@pos/ui';
 import type { Column } from '@pos/ui';
 import { useAuth } from '../contexts/AuthContext';
@@ -41,6 +41,9 @@ export const UsersPage: React.FC = () => {
   const [newRole, setNewRole]       = useState('');
   const [newPw, setNewPw]           = useState('');
   const [confirmPw, setConfirmPw]   = useState('');
+  const [showCreatePw, setShowCreatePw] = useState(false);
+  const [showNewPw, setShowNewPw]       = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
 
   const load = useCallback(() => {
     if (!storeId) return;
@@ -177,8 +180,8 @@ export const UsersPage: React.FC = () => {
         title="User Management"
         description="Create users, assign roles, and manage account access"
         actions={canCreate ? (
-          <Button variant="primary" size="sm" onClick={() => { setCreateForm({ username: '', email: '', password: '', role: 'cashier' }); setCreateModal(true); }}>
-            <PlusIcon size={16} className="mr-1.5" /> Create User
+          <Button variant="primary" size="sm" icon={<PlusIcon size={16} />} onClick={() => { setCreateForm({ username: '', email: '', password: '', role: 'cashier' }); setCreateModal(true); }}>
+            Create User
           </Button>
         ) : undefined}
       />
@@ -236,7 +239,17 @@ export const UsersPage: React.FC = () => {
           </div>
           <div>
             <label className="field-label">Password *</label>
-            <Input type="password" value={createForm.password} onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })} placeholder="Min 8 characters" />
+            <Input
+              type={showCreatePw ? 'text' : 'password'}
+              value={createForm.password}
+              onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+              placeholder="Min 8 characters"
+              suffix={
+                <button type="button" onClick={() => setShowCreatePw((s) => !s)} className="text-neutral-400 hover:text-neutral-600" tabIndex={-1}>
+                  {showCreatePw ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+                </button>
+              }
+            />
           </div>
           <div>
             <label className="field-label">Role *</label>
@@ -285,11 +298,31 @@ export const UsersPage: React.FC = () => {
         <div className="space-y-4">
           <div>
             <label className="field-label">New Password</label>
-            <Input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} placeholder="Min 8 characters" autoFocus />
+            <Input
+              type={showNewPw ? 'text' : 'password'}
+              value={newPw}
+              onChange={(e) => setNewPw(e.target.value)}
+              placeholder="Min 8 characters"
+              autoFocus
+              suffix={
+                <button type="button" onClick={() => setShowNewPw((s) => !s)} className="text-neutral-400 hover:text-neutral-600" tabIndex={-1}>
+                  {showNewPw ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+                </button>
+              }
+            />
           </div>
           <div>
             <label className="field-label">Confirm Password</label>
-            <Input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} />
+            <Input
+              type={showConfirmPw ? 'text' : 'password'}
+              value={confirmPw}
+              onChange={(e) => setConfirmPw(e.target.value)}
+              suffix={
+                <button type="button" onClick={() => setShowConfirmPw((s) => !s)} className="text-neutral-400 hover:text-neutral-600" tabIndex={-1}>
+                  {showConfirmPw ? <EyeOffIcon size={16} /> : <EyeIcon size={16} />}
+                </button>
+              }
+            />
           </div>
         </div>
       </Modal>

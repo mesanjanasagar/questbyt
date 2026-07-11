@@ -1,5 +1,7 @@
+import { TableStatus } from './enums';
+
 export type ReservationStatus = 'confirmed' | 'arrived' | 'seated' | 'completed' | 'cancelled' | 'no_show';
-export type TableStatus = 'available' | 'reserved' | 'occupied' | 'cleaning';
+export type { TableStatus };
 
 export interface Reservation {
   id: string;
